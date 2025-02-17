@@ -7,18 +7,21 @@ Template for Julia packages.
 """
 module LegendMakie
 
-import MakieCore
+    import MakieCore
+    import MakieCore: Theme
 
-include("lmplot.jl")
+    include("utils.jl")
 
-include("extdefs_rdsignals.jl")
+    include("lmplot.jl")
 
-include("register_extdeps.jl")
+    include("extdefs_rdsignals.jl")
 
-function __init__()
-    _register_extension_deps(
-        some_custom_waveform_plot => :RadiationDetectorSignals,
-    )
-end
+    include("register_extdeps.jl")
+
+    function __init__()
+        _register_extension_deps(
+            some_custom_waveform_plot => :RadiationDetectorSignals,
+        )
+    end
 
 end # module
