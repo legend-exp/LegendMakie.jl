@@ -4,5 +4,5 @@ using LegendMakie
 using Test
 
 
-@testset "lmplot" begin
+@testset "lplot" begin
 end

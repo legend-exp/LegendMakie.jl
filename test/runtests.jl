@@ -4,7 +4,7 @@ import Test
 
 Test.@testset "Package LegendMakie" begin
     include("test_aqua.jl")
-    include("test_lmplot.jl")
+    include("test_lplot.jl")
     include("test_rdsignals.jl")
     include("test_docs.jl")
 end # testset

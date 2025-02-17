@@ -8,11 +8,11 @@ using MakieCore
 using RadiationDetectorSignals: RDWaveform, ArrayOfRDWaveforms
 
 
-function LegendMakie.lmplot(wf::RDWaveform)
+function LegendMakie.lplot(wf::RDWaveform)
     # ...
 end
 
-function LegendMakie.lmplot(wf::ArrayOfRDWaveforms)
+function LegendMakie.lplot(wf::ArrayOfRDWaveforms)
     # ...
 end
 

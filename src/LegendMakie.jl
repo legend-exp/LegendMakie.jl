@@ -13,7 +13,7 @@ module LegendMakie
     include("utils.jl")
     include("legend_theme.jl")
 
-    include("lmplot.jl")
+    include("lplot.jl")
 
     include("extdefs_rdsignals.jl")
 
