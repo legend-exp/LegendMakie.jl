@@ -11,6 +11,7 @@ module LegendMakie
     import MakieCore: Theme
 
     include("utils.jl")
+    include("legend_theme.jl")
 
     include("lmplot.jl")
 
