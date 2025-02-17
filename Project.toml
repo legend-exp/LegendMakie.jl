@@ -7,11 +7,14 @@ MakieCore = "20f20a25-4f0e-4fdf-b5d1-57303727442b"
 
 [weakdeps]
 RadiationDetectorSignals = "bf2c0563-65cf-5db2-a620-ceb7de82658c"
+Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
 
 [extensions]
+LegendMakieExt = "Makie"
 LegendMakieRadiationDetectorSignalsExt = "RadiationDetectorSignals"
 
 [compat]
+Makie = "0.22"
 MakieCore = "0.9"
 RadiationDetectorSignals = "0.3.8"
 julia = "1.10"
