@@ -1,0 +1,17 @@
+name = "LegendMakie"
+uuid = "ce9a434a-d062-4f11-9371-3059ddb1c48a"
+version = "0.1.0"
+
+[deps]
+MakieCore = "20f20a25-4f0e-4fdf-b5d1-57303727442b"
+
+[weakdeps]
+RadiationDetectorSignals = "bf2c0563-65cf-5db2-a620-ceb7de82658c"
+
+[extensions]
+LegendMakieRadiationDetectorSignalsExt = "RadiationDetectorSignals"
+
+[compat]
+MakieCore = "0.9"
+RadiationDetectorSignals = "0.3.8"
+julia = "1.10"
