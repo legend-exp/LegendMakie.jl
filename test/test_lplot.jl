@@ -3,6 +3,8 @@
 using LegendMakie
 using Test
 
+# load Makie extension
+using Makie
 
 @testset "lplot" begin
 end
