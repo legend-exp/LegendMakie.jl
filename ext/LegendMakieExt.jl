@@ -10,10 +10,14 @@ module LegendMakieExt
     import LaTeXStrings
     import Makie
     import MathTeXEngine
+    import StatsBase
+    import Unitful
     
     import LegendMakie: pt
     import Unitful: @u_str
 
+    include("recipes/recipes.jl")
+    include("recipes/lplot.jl")
     include("recipes/watermarks.jl")
 
     function __init__()

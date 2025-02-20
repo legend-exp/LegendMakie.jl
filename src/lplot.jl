@@ -12,6 +12,10 @@ function lplot end
 function lplot! end
 export lplot, lplot!
 
+
+# recipes
+function residualplot! end
+
 # watermark functions
 function add_logo! end
 function add_legend_logo! end
