@@ -5,6 +5,7 @@ using Makie
 
 import LegendSpecFits
 import Distributions
+import StatsBase
 import Unitful: @u_str
 
 using Test
@@ -16,7 +17,7 @@ using Test
 
         # test default watermark
         ax = Axis(fig[1,1])
-        hist!(ax, randn(10000))
+        @test_nowarn lplot!(StatsBase.fit(StatsBase.Histogram, randn(10000)))
         @test_nowarn LegendMakie.add_watermarks!()
 
         # test alternative watermark
