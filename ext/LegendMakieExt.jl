@@ -4,9 +4,17 @@ module LegendMakieExt
 
     import LegendMakie
 
+    import Dates
+    import FileIO
+    import Format
     import LaTeXStrings
     import Makie
     import MathTeXEngine
+    
+    import LegendMakie: pt
+    import Unitful: @u_str
+
+    include("recipes/watermarks.jl")
 
     function __init__()
         # maybe just use with_theme() in every plot recipe?
