@@ -17,7 +17,7 @@ using Test
 
         # test alternative watermark
         ax2 = Axis(fig[1,2])
-        hist!(ax2, randn(10000))
+        @test_nowarn LegendMakie.residualplot!(ax2, (x = 1:10, residuals_norm = randn(10)))
         @test_nowarn LegendMakie.add_watermarks!(legend_logo = true, position = "outer top", preliminary = false)
     end
 end
