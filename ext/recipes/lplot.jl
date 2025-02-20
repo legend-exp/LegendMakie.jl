@@ -207,3 +207,28 @@ function LegendMakie.lplot!(
 
     fig
 end
+
+
+function LegendMakie.lplot!(args...; watermark::Bool = false, kwargs...)
+
+    fig = Makie.current_figure()
+
+    #create plot
+    ax = if !isnothing(Makie.current_axis())
+        Makie.current_axis()
+    else
+        Makie.Axis(fig[1,1],
+            titlesize = 18,
+            titlegap = 1,
+            titlealign = :right
+        )
+    end
+
+    # use built-in method as fallback if existent, tweak appearance
+    Makie.plot!(args...; kwargs...)
+
+    # add watermarks
+    watermark && LegendMakie.add_watermarks!(; kwargs...)
+
+    fig
+end

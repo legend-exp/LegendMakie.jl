@@ -5,6 +5,7 @@ Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
 LegendSpecFits = "18221496-77af-46cf-bab8-820da09f7f97"
 Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
 RadiationDetectorSignals = "bf2c0563-65cf-5db2-a620-ceb7de82658c"
+StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
 
