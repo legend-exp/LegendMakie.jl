@@ -25,6 +25,7 @@ export lsavefig
 
 # recipes
 function residualplot! end
+function aoecorrectionplot! end
 
 # watermark functions
 function add_logo! end
