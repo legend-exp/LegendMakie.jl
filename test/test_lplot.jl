@@ -46,6 +46,7 @@ using Test
             μs = [result_fit[band].μ for band in compton_bands]
             σs = [result_fit[band].σ for band in compton_bands]
             result_fit_single, report_fit_single = LegendSpecFits.fit_aoe_corrections(compton_bands, μs, σs)
+            result_fit_combined, report_fit_combined = LegendSpecFits.fit_aoe_compton_combined(compton_band_peakhists.peakhists, compton_band_peakhists.peakstats, compton_bands, result_fit_single, uncertainty=true)
 
             # Compton band (individual) fit
             @test_nowarn lplot(report_fit[first(compton_bands)])
@@ -53,6 +54,10 @@ using Test
             # A/E correction plots
             @test_nowarn lplot(report_fit_single.report_μ, col = 1, figsize = (1200,420))
             @test_nowarn lplot!(report_fit_single.report_σ, col = 2)
+
+            # A/E combined fit plots
+            @test_nowarn lplot(report_fit_single.report_μ, report_fit_combined.report_μ, col = 1, figsize = (1200,420))
+            @test_nowarn lplot!(report_fit_single.report_σ, report_fit_combined.report_σ, col = 2)
         end
     end
 end
