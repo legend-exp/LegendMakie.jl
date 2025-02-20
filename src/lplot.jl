@@ -13,6 +13,16 @@ function lplot! end
 export lplot, lplot!
 
 
+"""
+    lsavefig(filename)
+
+Saves the current figure to a file with a given `filename`.
+
+"""
+function lsavefig end
+export lsavefig
+
+
 # recipes
 function residualplot! end
 

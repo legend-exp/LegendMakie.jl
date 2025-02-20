@@ -44,4 +44,9 @@ module LegendMakieExt
         fig
     end
 
+    function LegendMakie.lsavefig(name::AbstractString; kwargs...)
+        fig = Makie.current_figure()
+        isnothing(fig) && throw(ArgumentError("No figure to save to file."))
+        FileIO.save(name, fig; kwargs...)
+    end
 end
