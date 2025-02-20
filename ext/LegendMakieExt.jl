@@ -14,6 +14,7 @@ module LegendMakieExt
     import LegendMakie: pt
     import Unitful: @u_str
 
+    include("recipes/recipes.jl")
     include("recipes/watermarks.jl")
 
     function __init__()
