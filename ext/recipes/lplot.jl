@@ -132,3 +132,78 @@ function LegendMakie.lplot!(
 
     fig
 end
+
+
+function LegendMakie.lplot!( 
+        report::NamedTuple{(:par, :f_fit, :x, :y, :gof, :e_unit, :label_y, :label_fit)}; 
+        title::AbstractString = "", show_residuals::Bool = true,
+        xticks = 500:250:2250, xlims = (500,2300), ylims = nothing,
+        legend_position = :rt, col = 1, watermark::Bool = false, kwargs...
+    )
+
+    fig = Makie.current_figure()
+
+    # create plot
+    g = Makie.GridLayout(fig[1,col])
+    ax = Makie.Axis(g[1,1], 
+        title = title, titlefont = :bold, titlesize = 16pt, 
+        xlabel = "E ($(report.e_unit))", ylabel = report.label_y * " (a.u.)", 
+        xticks = xticks, limits = (xlims, ylims)
+    )
+
+    LegendMakie.aoecorrectionplot!(ax, report)
+    if legend_position != :none 
+        Makie.axislegend(ax, position = legend_position)
+    end
+
+    # add residuals
+    if !isempty(report.gof) && show_residuals
+
+        ax.xticklabelsize = 0
+        ax.xticksize = 0
+        ax.xlabel = ""
+
+        ax2 = Makie.Axis(g[2,1],
+            xlabel = "E ($(report.e_unit))", ylabel = "Residuals (σ)",
+            xticks = xticks, yticks = -3:3:3, limits = (xlims,(-5,5))
+        )
+        LegendMakie.residualplot!(ax2, (x = report.x, residuals_norm = report.gof.residuals_norm))
+
+        # link axis and put plots together
+        Makie.linkxaxes!(ax, ax2)
+        Makie.rowgap!(g, 0)
+        Makie.rowsize!(g, 1, Makie.Auto(3))
+
+        # align ylabels
+        yspace = maximum(Makie.tight_yticklabel_spacing!, (ax, ax2))
+        ax.yticklabelspace = yspace
+        ax2.yticklabelspace = yspace
+    end
+
+    all = Makie.Axis(g[:,:])
+    Makie.hidedecorations!(all)
+    Makie.hidespines!(all)
+    Makie.current_axis!(all)
+
+    # add watermarks
+    watermark && LegendMakie.add_watermarks!(; kwargs...)
+
+    fig 
+end
+
+
+function LegendMakie.lplot!( 
+        report::NamedTuple{(:par, :f_fit, :x, :y, :gof, :e_unit, :label_y, :label_fit)},
+        com_report::NamedTuple{(:values, :label_y, :label_fit, :energy)};
+        legend_position = :rt, col = 1, kwargs...
+    )
+
+    fig = LegendMakie.lplot!(report, legend_position = :none, col = col; kwargs...)
+
+    g = last(Makie.contents(fig[1,col]))
+    ax = Makie.contents(g)[1]
+    Makie.lines!(ax, com_report.energy, com_report.values, linewidth = 4, color = :red, linestyle = :dash, label = LaTeXStrings.latexstring("\\fontfamily{Roboto}" * com_report.label_fit))
+    Makie.axislegend(ax, position = legend_position)
+
+    fig
+end
