@@ -97,4 +97,22 @@ module LegendMakieLegendDataManagementExt
 
         p
     end
+
+    function LegendMakie.lplot!(
+            chinfo::TypedTables.Table, pars::PropDicts.PropDict, properties::AbstractVector{Symbol} = Symbol[];
+            watermark::Bool = true, kwargs...
+        )
+
+        fig = Makie.current_figure()
+
+        # create plot
+        ax = Makie.Axis(fig[1,1])
+        LegendMakie.parameterplot!(ax, chinfo, pars, properties; kwargs...)
+
+        # add watermarks
+        watermark && LegendMakie.add_watermarks!(; kwargs...)
+
+        fig
+    end
+
 end
