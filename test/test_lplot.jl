@@ -4,7 +4,13 @@ using LegendMakie
 using Makie
 
 import LegendSpecFits
+import LegendDataManagement
+import LegendTestData
+testdata_dir = joinpath(LegendTestData.legend_test_data_path(), "data", "legend")
+ENV["LEGEND_DATA_CONFIG"] = joinpath(testdata_dir, "config.json")
+
 import Distributions
+import PropDicts
 import StatsBase
 import Unitful: @u_str
 
@@ -59,6 +65,15 @@ using Test
             # A/E combined fit plots
             @test_nowarn lplot(report_fit_single.report_μ, report_fit_combined.report_μ, col = 1, figsize = (1200,420))
             @test_nowarn lplot!(report_fit_single.report_σ, report_fit_combined.report_σ, col = 2)
+        end
+
+        @testset "Parameter plots" begin
+            l200 = LegendDataManagement.LegendData(:l200)
+            filekey = LegendDataManagement.start_filekey(l200, :p02, :r000, :cal)
+            dets = l200.metadata.hardware.detectors.germanium.diodes
+            chinfo = LegendDataManagement.channelinfo(l200, filekey, system = :geds)
+            pd = PropDicts.PropDict(Dict(Symbol.(det.name) => det.production.mass_in_g for det in dets))
+            @test_nowarn LegendMakie.lplot(chinfo, pd)
         end
     end
 end
