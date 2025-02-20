@@ -48,10 +48,10 @@ const LegendTheme = Theme(
         colgap = 20
     ),
     fonts = (
-        bold        = LegendFont * " Bold",
-        bold_italic = LegendFont * " Bold Italic",
-        italic      = LegendFont * " Italic",
-        regular     = LegendFont * " Regular"
+        bold        = joinpath(dirname(pathof(LegendMakie)), "fonts", LegendFont * "-Bold.ttf"),
+        bold_italic = joinpath(dirname(pathof(LegendMakie)), "fonts", LegendFont * "-BoldItalic.ttf"),
+        italic      = joinpath(dirname(pathof(LegendMakie)), "fonts", LegendFont * "-Italic.ttf"),
+        regular     = joinpath(dirname(pathof(LegendMakie)), "fonts", LegendFont * "-Regular.ttf")
     ),
     palette = (
         color = [ICPCBlue, PPCPurple, BEGeOrange, CoaxGreen],
