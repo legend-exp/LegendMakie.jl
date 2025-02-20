@@ -11,3 +11,10 @@ Plots `objs` via Makie in a LEGEND-specific form/style into a new plot.
 function lplot end
 function lplot! end
 export lplot, lplot!
+
+# watermark functions
+function add_logo! end
+function add_legend_logo! end
+function add_juleana_logo! end
+function add_text! end
+function add_watermarks! end
