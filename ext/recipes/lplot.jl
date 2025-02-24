@@ -49,11 +49,8 @@ function LegendMakie.lplot!(
         ax2.yticklabelspace = yspace
     end
 
-    all = Makie.Axis(g[:,:])
-    Makie.hidedecorations!(all)
-    Makie.hidespines!(all)
-    Makie.current_axis!(all)
-    
+    # add watermarks
+    Makie.current_axis!(ax)
     watermark && LegendMakie.add_watermarks!(; kwargs...)
     
     fig
@@ -122,12 +119,8 @@ function LegendMakie.lplot!(
         ax2.yticklabelspace = yspace
     end
 
-    all = Makie.Axis(g[:,:])
-    Makie.hidedecorations!(all)
-    Makie.hidespines!(all)
-    Makie.current_axis!(all)
-
     # add watermarks
+    Makie.current_axis!(ax)
     watermark && LegendMakie.add_watermarks!(; kwargs...)
 
     fig
@@ -180,15 +173,57 @@ function LegendMakie.lplot!(
         ax2.yticklabelspace = yspace
     end
 
-    all = Makie.Axis(g[:,:])
-    Makie.hidedecorations!(all)
-    Makie.hidespines!(all)
-    Makie.current_axis!(all)
-
     # add watermarks
+    Makie.current_axis!(ax)
     watermark && LegendMakie.add_watermarks!(; kwargs...)
 
     fig 
+end
+
+
+function LegendMakie.lplot!( 
+        report::NamedTuple{(:h_before, :h_after_low, :h_after_ds, :dep_h_before, :dep_h_after_low, :dep_h_after_ds, :sf, :n0, :lowcut, :highcut, :e_unit, :bin_width)}; 
+        title::AbstractString = "", watermark::Bool = true, final::Bool = true, kwargs...
+    )
+
+    fig = Makie.current_figure()
+
+    # create main histogram plot
+    ax = Makie.Axis(fig[1,1],
+        title = title, limits = ((0,2700), (1,maximum(report.h_before.weights) * 1.2)), yscale = Makie.log10,
+        xlabel = "Energy (keV)", ylabel = "Counts / $(round(step(first(report.h_before.edges)), digits = 2)) keV", 
+    )
+    Makie.stephist!(ax, StatsBase.midpoints(first(report.h_before.edges)),    weights = report.h_before.weights,    bins = first(report.h_before.edges),    color = (LegendMakie.AchatBlue, 0.5),  label = "Before A/E")
+    Makie.stephist!(ax, StatsBase.midpoints(first(report.h_after_low.edges)), weights = report.h_after_low.weights, bins = first(report.h_after_low.edges), color = (LegendMakie.BEGeOrange, 1), label = "After low A/E")
+    Makie.stephist!(ax, StatsBase.midpoints(first(report.h_after_ds.edges)),  weights = report.h_after_ds.weights,  bins = first(report.h_after_ds.edges),  color = (LegendMakie.CoaxGreen, 0.5),  label = "After DS A/E")
+    Makie.axislegend(ax, position = (0.96,1))
+
+    # add inset
+    ax_inset = Makie.Axis(fig[1,1],
+        width = Makie.Relative(0.4),
+        height = Makie.Relative(0.2),
+        halign = 0.55,
+        valign = 0.95, 
+        yscale = Makie.log10,
+        xlabel = "Energy (keV)",
+        ylabel = "Counts",
+        xticks = 1585:10:1645,
+        xlabelsize = 12pt,
+        ylabelsize = 12pt,
+        xticklabelsize = 10pt,
+        yticklabelsize = 10pt,
+        yticks = (exp10.(0:10), "1" .* join.(fill.("0", 0:10))),
+        limits = (extrema(first(report.dep_h_before.edges)), (0.9, max(100, maximum(report.dep_h_before.weights)) * 1.2))
+    )
+    Makie.stephist!(ax_inset, StatsBase.midpoints(first(report.dep_h_before.edges)),    weights = replace(report.dep_h_before.weights, 0 => 1e-10),    bins = first(report.dep_h_before.edges),    color = (LegendMakie.AchatBlue, 0.5),  label = "Before A/E")
+    Makie.stephist!(ax_inset, StatsBase.midpoints(first(report.dep_h_after_low.edges)), weights = replace(report.dep_h_after_low.weights, 0 => 1e-10), bins = first(report.dep_h_after_low.edges), color = (LegendMakie.BEGeOrange, 1), label = "After low A/E")
+    Makie.stephist!(ax_inset, StatsBase.midpoints(first(report.dep_h_after_ds.edges)),  weights = replace(report.dep_h_after_ds.weights, 0 => 1e-10),  bins = first(report.dep_h_after_ds.edges),  color = (LegendMakie.CoaxGreen, 0.5),  label = "After DS A/E")
+
+    # add watermarks
+    Makie.current_axis!(ax)
+    watermark && LegendMakie.add_watermarks!(; final, kwargs...)
+
+    fig
 end
 
 
