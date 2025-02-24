@@ -67,6 +67,16 @@ using Test
             @test_nowarn lplot!(report_fit_single.report_σ, report_fit_combined.report_σ, col = 2)
         end
 
+        @testset "A/E cut histogram" begin
+            # generate fake A/E distribution and energy histogram
+            aoe = vcat(randn(50_000), randn(950_000) .- 3)
+            e_cal = vcat(randn(10_000) .+ 1593, rand(Distributions.Exponential(2000), 990_000))*u"keV"
+            _, report_cut = LegendSpecFits.get_low_aoe_cut(aoe, e_cal)
+
+            # A/E cut histogram
+            @test_nowarn lplot(report_cut, figsize = (750,400), title = "Test")
+        end
+
         @testset "Parameter plots" begin
             l200 = LegendDataManagement.LegendData(:l200)
             filekey = LegendDataManagement.start_filekey(l200, :p02, :r000, :cal)
