@@ -243,6 +243,58 @@ function LegendMakie.lplot!(
     fig
 end
 
+function LegendMakie.lplot!( 
+        report::NamedTuple{(:peak, :window, :fct, :bin_width, :bin_width_qdrift, :aoe_peak, :aoe_ctc, :qdrift_peak, :h_before, :h_after, :σ_before, :σ_after, :report_before, :report_after)},
+        label_before = "Before correction", label_after = "After correction", watermark::Bool = true, kwargs...
+    )
+
+    # Best results for figsize (600,600)
+    fig = Makie.current_figure()
+    
+    g = Makie.GridLayout(fig[1,1])
+    
+    ax = Makie.Axis(g[1,1], limits = (-9,5,0,nothing), ylabel = "Counts / $(round(step(first(report.h_before.edges)), digits = 2))")
+    Makie.plot!(ax, report.h_before, color = :darkgrey, label = label_before)
+    Makie.plot!(ax, report.h_after, color = (:purple, 0.5), label = label_after)
+    Makie.axislegend(position = :lt)
+    
+    ax2 = Makie.Axis(g[2,1], limits = (-9,5,0,11.5), xticks = -8:2:5, yticks = 0:2:10, xlabel = "A/E classifier", ylabel = "Qdrift / E")
+    k_before = KernelDensity.kde((report.aoe_peak, report.qdrift_peak))
+    k_after = KernelDensity.kde((report.aoe_ctc, report.qdrift_peak))
+    Makie.contourf!(ax2, k_before.x, k_before.y, k_before.density, levels = 15, colormap = :binary)
+    Makie.contour!(ax2, k_before.x, k_before.y, k_before.density, levels = 15 - 1, color = :white)
+    Makie.contour!(ax2, k_after.x, k_after.y, k_after.density, levels = 15 - 1, colormap = :plasma)
+    Makie.lines!(ax2, [0], [0], label = label_before, color = :darkgrey)
+    Makie.lines!(ax2, [0], [0], label = label_after, color = (:purple, 0.5))
+    Makie.axislegend(position = :lb)
+     
+    ax3 = Makie.Axis(g[2,2], limits = (0,nothing,0,11.5), xlabel = "Counts / 0.1")
+    Makie.plot!(ax3, StatsBase.fit(StatsBase.Histogram, report.qdrift_peak, 0:0.1:11.5), color = :darkgrey, label = "Before correction", direction = :x)
+    ax3.xticks = Makie.WilkinsonTicks(3, k_min = 3, k_max=4)
+    
+    # Formatting
+    Makie.linkxaxes!(ax,ax2)
+    Makie.hidexdecorations!(ax)
+    Makie.rowgap!(g, 0)
+    Makie.rowsize!(g, 1, Makie.Auto(0.5))
+    Makie.linkyaxes!(ax2,ax3)
+    Makie.hideydecorations!(ax3)
+    Makie.colgap!(g, 0)
+    Makie.colsize!(g, 2, Makie.Auto(0.5))
+    xspace = maximum(Makie.tight_xticklabel_spacing!, (ax2, ax3))
+    ax2.xticklabelspace = xspace
+    ax3.xticklabelspace = xspace
+    yspace = maximum(Makie.tight_yticklabel_spacing!, (ax, ax2))
+    ax.yticklabelspace = yspace
+    ax2.yticklabelspace = yspace
+    
+    # add watermarks
+    Makie.current_axis!(ax3)
+    watermark && LegendMakie.add_watermarks!(; kwargs...)
+    
+    fig
+end
+
 
 function LegendMakie.lplot!(args...; watermark::Bool = false, kwargs...)
 
