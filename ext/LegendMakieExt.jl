@@ -7,6 +7,7 @@ module LegendMakieExt
     import Dates
     import FileIO
     import Format
+    import KernelDensity
     import LaTeXStrings
     import Makie
     import MathTeXEngine
