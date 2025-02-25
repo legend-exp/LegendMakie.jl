@@ -84,7 +84,7 @@ using Test
             aoe_corr = vcat(-rand(Distributions.Exponential(5.0), 2_000), zeros(8_000)) .+ randn(10_000)
             qdrift_e = max.(0, randn(10_000) .+ 5)
             result_aoe_ctc, report_aoe_ctc = LegendSpecFits.ctc_aoe(aoe_corr, e_cal, qdrift_e, [E0])
-            lplot(report_aoe_ctc, figsize = (600,600))
+            @test_nowarn lplot(report_aoe_ctc, figsize = (600,600))
         end
 
         @testset "Parameter plots" begin
