@@ -39,16 +39,23 @@ using Test
         end
 
         @testset "Energy calibration" begin
-            ecal = vcat(rand(Distributions.Exponential(50_000),97_500), 261_450 .+ 200 .* randn(2_000), 210_350 .+ 150 .* randn(300), 159_300 .+ 100 .* randn(200))
-            result_simple, report_simple = LegendSpecFits.simple_calibration(ecal, [1592.513, 2103.512, 2614.511]u"keV", [25, 25, 35]u"keV", [25, 25, 30]u"keV", calib_type = :th228)
+            ecal = filter(x -> x <= 262_000, vcat(rand(Distributions.Exponential(70_000),97_500), 261_450 .+ 200 .* randn(2_000), 210_350 .+ 150 .* randn(300), 159_300 .+ 100 .* randn(200)))
+            lines = [:Tl208DEP, :Tl208SEP, :Tl208FEP]
+            energies = [1592.513, 2103.512, 2614.511]u"keV"
+            result_simple, report_simple = LegendSpecFits.simple_calibration(ecal, energies, [25, 25, 35]u"keV", [25, 25, 30]u"keV", calib_type = :th228)
             @testset "Simple energy calibration" begin
                 @test_nowarn lplot(report_simple)
                 @test_nowarn lplot(report_simple, cal = false)
             end
             m_cal_simple = result_simple.c
-            result_fit, report_fit = LegendSpecFits.fit_peaks(result_simple.peakhists, result_simple.peakstats, [:Tl208DEP, :Tl208SEP, :Tl208FEP]; e_unit=result_simple.unit, calib_type=:th228, m_cal_simple=m_cal_simple)
+            result_fit, report_fit = LegendSpecFits.fit_peaks(result_simple.peakhists, result_simple.peakstats, lines; e_unit=result_simple.unit, calib_type=:th228, m_cal_simple=m_cal_simple)
+            @testset "Fit peaks for energy calibration" begin
+                @test_nowarn lplot(report_fit, figsize = (600, 400*length(report_fit)), watermark = false)
+            end
+            μ_fit = getfield.(getindex.(Ref(result_fit), lines), :centroid)
+            result_calib, report_calib = LegendSpecFits.fit_calibration(1, μ_fit, energies)
             @testset "Fit energy calibration" begin
-                @test_nowarn lplot(report_fit, figsize = (600, 400*length(report_fit)), title = "Test title")
+                @test_nowarn lplot(report_calib, xerrscaling=10, yerrscaling=10, additional_pts=(μ = [100_000], peaks = [1000u"keV"]), title = "Test")
             end
         end
 
