@@ -99,9 +99,9 @@ module LegendMakieMeasurementsExt
             additional_pts::NamedTuple = NamedTuple(),
             xlims = (0, 1.2*Measurements.value(maximum(report.x))), ylims = nothing,
             xlabel = "Energy (ADC)", ylabel = "Energy (calibrated)", title::AbstractString = "",
-            show_residuals::Bool = true, plot_ribbon::Bool = true, 
+            show_residuals::Bool = true, plot_ribbon::Bool = true, legend_position = :lt,
             xerrscaling::Real = 1, yerrscaling::Real = 1, row::Int = 1, col::Int = 1,
-            watermark::Bool = true, final::Bool = true, kwargs...
+            watermark::Bool = true, final::Bool = (title != ""), kwargs...
         )
         
         fig = Makie.current_figure()
@@ -114,7 +114,7 @@ module LegendMakieMeasurementsExt
         )
         
         LegendMakie.energycalibrationplot!(ax, report, additional_pts; plot_ribbon, xerrscaling, yerrscaling)
-        Makie.axislegend(ax, position = :lt)
+        legend_position != :none && Makie.axislegend(ax, position = legend_position)
         
         if !isempty(report.gof) && show_residuals
 
@@ -172,6 +172,41 @@ module LegendMakieMeasurementsExt
             end,
             xlabel = "Energy (ADC)", ylabel = "Energy ($(report.e_unit))", xlims = (0, 1.1*Measurements.value(maximum(report.x))); kwargs...
         )
+    end
+
+    function LegendMakie.lplot!(
+            report::NamedTuple{(:par, :f_fit, :x, :y, :gof, :e_unit, :qbb, :type)};
+            additional_pts::NamedTuple = NamedTuple(), xlims = (0,3000), title::AbstractString = "",
+            kwargs...
+        )
+        
+        if report.type != :fwhm
+            @warn "Unknown calibration type $(report.type), no plot generated."
+            return Makie.current_figure()
+        end
+
+        fig = LegendMakie.lplot!(
+            report[(:par, :f_fit, :x, :y, :gof)],
+            additional_pts = if !isempty(additional_pts)
+                fwhm_cal = report.f_fit.(Unitful.ustrip.(additional_pts.peaks))
+                (x = Unitful.ustrip.(report.e_unit, additional_pts.peaks), y = Unitful.ustrip.(report.e_unit, additional_pts.fwhm),
+                    residuals_norm = (Measurements.value.(fwhm_cal .- Unitful.ustrip.(report.e_unit, additional_pts.fwhm))) ./ Measurements.uncertainty.(fwhm_cal))
+            else
+                NamedTuple()
+            end,
+            xlabel = "Energy ($(report.e_unit))", ylabel = "FWHM ($(report.e_unit))",
+            legend_position = :none; xlims, title, kwargs...
+        )
+        
+        ax = first(fig.content)
+        Makie.current_axis!(ax)
+        qbb = Unitful.ustrip(report.e_unit, Measurements.value(report.qbb))
+        Δqbb = Unitful.ustrip(report.e_unit, Measurements.uncertainty(report.qbb))
+        Makie.hlines!(ax, [qbb], color = LegendMakie.CoaxGreen, label = LaTeXStrings.latexstring("\\fontfamily{Roboto}Q_{\\beta \\beta}:" * " $(round(Unitful.ustrip(report.e_unit, report.qbb), digits=2))\\;\\text{$(report.e_unit)}"))
+        Makie.band!(ax, range(xlims..., length = 2), fill(qbb - Δqbb, 2), fill(qbb + Δqbb, 2), color = (LegendMakie.CoaxGreen, 0.2))
+        Makie.axislegend(ax, position = :lt)
+        
+        fig
     end
 
 end
