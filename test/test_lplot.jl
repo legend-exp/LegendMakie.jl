@@ -38,6 +38,13 @@ using Test
             @test_nowarn lplot(report, xlabel = "x")
         end
 
+        @testset "Simple energy calibration" begin
+            ecal = vcat(rand(Distributions.Exponential(40_000),90_000), 261_450 .+ 1_000 .* randn(1_000))
+            _, report_simple = LegendSpecFits.simple_calibration(ecal, [2614.511u"keV"], [35u"keV"], [30u"keV"], calib_type = :th228)
+            @test_nowarn lplot(report_simple)
+            @test_nowarn lplot(report_simple, cal = false)
+        end
+
         @testset "A/E correction" begin
             # generate fake A/E distribution
             e_cal = rand(Distributions.Exponential(300), 5_000_000) .+ 300
@@ -81,9 +88,10 @@ using Test
             # generate fake A/E and Qdrift/E distribution 
             E0 = 550u"keV"
             e_cal = fill(E0, 10_000)
-            aoe_corr = vcat(-rand(Distributions.Exponential(5.0), 2_000), zeros(8_000)) .+ randn(10_000)
+            aoe_corr = clamp.(vcat(-rand(Distributions.Exponential(5.0), 2_000), zeros(8_000)) .+ randn(10_000), -49.0, 7.0)
             qdrift_e = max.(0, randn(10_000) .+ 5)
-            result_aoe_ctc, report_aoe_ctc = LegendSpecFits.ctc_aoe(aoe_corr, e_cal, qdrift_e, [E0])
+            @test length(e_cal) == length(aoe_corr) == length(qdrift_e) == 10_000
+            result_aoe_ctc, report_aoe_ctc = LegendSpecFits.ctc_aoe(aoe_corr, e_cal, qdrift_e, [E0-10u"keV"])
             @test_nowarn lplot(report_aoe_ctc, figsize = (600,600))
         end
 
