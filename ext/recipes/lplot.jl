@@ -367,11 +367,15 @@ end
 # fallback method: use Makie.plot!
 function LegendMakie.lplot!(args...; watermark::Bool = false, kwargs...)
 
+    fig = Makie.current_figure()
+    ax = isnothing(Makie.current_axis()) ? Makie.Axis(fig[1,1]) : Makie.current_axis()
+
     # use built-in method as fallback if existent, tweak appearance
-    Makie.plot!(args...; kwargs...)
+    Makie.plot!(ax, args...; kwargs...)
 
     # add watermarks
+    Makie.current_axis!(ax)
     watermark && LegendMakie.add_watermarks!(; kwargs...)
 
-    Makie.current_figure()
+    fig
 end
