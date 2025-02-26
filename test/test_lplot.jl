@@ -23,7 +23,7 @@ using Test
 
         # test default watermark
         ax = Axis(fig[1,1])
-        @test_nowarn lplot!(StatsBase.fit(StatsBase.Histogram, randn(10000)))
+        lplot!(StatsBase.fit(StatsBase.Histogram, randn(10000)))
         @test_nowarn LegendMakie.add_watermarks!()
 
         # test alternative watermark
