@@ -5,6 +5,7 @@ function round_wo_units(x::Unitful.RealOrRealQuantity; digits::Int=2)
     Unitful.unit(x) == Unitful.NoUnits ? round(x; digits) : round(Unitful.unit(x), x; digits)
 end
 
+# single fits
 function LegendMakie.lplot!(
         report::NamedTuple{(:f_fit, :h, :μ, :σ, :gof)};
         title::AbstractString = "", show_residuals::Bool = true,
@@ -126,7 +127,44 @@ function LegendMakie.lplot!(
     fig
 end
 
+# Ecal
+function LegendMakie.lplot!(
+        report::NamedTuple{(:h_calsimple, :h_uncal, :c, :fep_guess, :peakhists, :peakstats)};
+        cal::Bool = true, title::AbstractString = "", yscale = Makie.log10, 
+        final::Bool = (title != ""), watermark::Bool = true, kwargs...
+    )
+    
+    fig = Makie.current_figure()
+    
+    # select correct histogram
+    h = LinearAlgebra.normalize(cal ? report.h_calsimple : report.h_uncal, mode = :density)
+    fep_guess = cal ? 2614.5 : report.fep_guess
 
+    # create main histogram plot
+    ax = Makie.Axis(
+        fig[1,1], 
+        title = title, titlegap = 2,
+        limits = (0, cal ? 3000 : 1.2*report.fep_guess, 0.99*minimum(filter(x -> x > 0, h.weights)), 1.2 * maximum(h.weights)*1.1),
+        xticks = cal ? (0:300:3000) : (0:50000:1.2*report.fep_guess),
+        xlabel = "Energy ($(cal ? "keV" : "ADC"))",
+        ylabel = "Counts",
+        yscale = yscale
+    )
+    
+    Makie.stephist!(ax, StatsBase.midpoints(first(h.edges)), bins = first(h.edges), weights = h.weights, label = "Energy")
+    Makie.vlines!(ax, [fep_guess], color = :red, label = "FEP Guess", linewidth = 1.5)
+    Makie.axislegend(ax, position = :ct)
+    
+    Makie.current_axis!(ax)
+    watermark && LegendMakie.add_watermarks!(; final, kwargs...)
+    
+    fig
+end
+
+
+
+
+# A/E
 function LegendMakie.lplot!( 
         report::NamedTuple{(:par, :f_fit, :x, :y, :gof, :e_unit, :label_y, :label_fit)}; 
         title::AbstractString = "", show_residuals::Bool = true,
@@ -294,7 +332,6 @@ function LegendMakie.lplot!(
     
     fig
 end
-
 
 function LegendMakie.lplot!(args...; watermark::Bool = false, kwargs...)
 

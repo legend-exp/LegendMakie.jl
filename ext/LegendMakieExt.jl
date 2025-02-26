@@ -9,6 +9,7 @@ module LegendMakieExt
     import Format
     import KernelDensity
     import LaTeXStrings
+    import LinearAlgebra
     import Makie
     import MathTeXEngine
     import StatsBase
