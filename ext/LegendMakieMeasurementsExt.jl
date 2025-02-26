@@ -93,4 +93,85 @@ module LegendMakieMeasurementsExt
         p
     end
 
+
+    function LegendMakie.lplot!(
+            report::NamedTuple{(:par, :f_fit, :x, :y, :gof)};
+            additional_pts::NamedTuple = NamedTuple(),
+            xlims = (0, 1.2*Measurements.value(maximum(report.x))), ylims = nothing,
+            xlabel = "Energy (ADC)", ylabel = "Energy (calibrated)", title::AbstractString = "",
+            show_residuals::Bool = true, plot_ribbon::Bool = true, 
+            xerrscaling::Real = 1, yerrscaling::Real = 1, row::Int = 1, col::Int = 1,
+            watermark::Bool = true, final::Bool = true, kwargs...
+        )
+        
+        fig = Makie.current_figure()
+            
+        g = Makie.GridLayout(fig[row,col])
+        ax = Makie.Axis(g[1,1],
+            title = title,
+            limits = (xlims, ylims),
+            xlabel = xlabel, ylabel = ylabel,
+        )
+        
+        LegendMakie.energycalibrationplot!(ax, report, additional_pts; plot_ribbon, xerrscaling, yerrscaling)
+        Makie.axislegend(ax, position = :lt)
+        
+        if !isempty(report.gof) && show_residuals
+
+            ax.xticklabelsize = 0
+            ax.xticksize = 0
+            ax.xlabel = ""
+
+            ax2 = Makie.Axis(g[2,1], yticks = -3:3:3, limits = (xlims,(-5,5)), xlabel = xlabel, ylabel = "Residuals (σ)")
+            LegendMakie.residualplot!(ax2, (x = Measurements.value.(report.x), residuals_norm = report.gof.residuals_norm))
+            # add the additional points
+            if !isempty(additional_pts)
+                Makie.scatter!(ax2, Measurements.value.(additional_pts.x), additional_pts.residuals_norm, 
+                        marker = :circle, color = :silver, strokewidth = 1, strokecolor = :black)
+            end
+
+            # link axis and put plots together
+            Makie.linkxaxes!(ax, ax2)
+            Makie.rowgap!(g, 0)
+            Makie.rowsize!(g, 1, Makie.Auto(4))
+
+            # align ylabels
+            yspace = maximum(Makie.tight_yticklabel_spacing!, (ax, ax2))
+            ax.yticklabelspace = yspace
+            ax2.yticklabelspace = yspace
+        end
+
+        # add watermarks
+        Makie.current_axis!(ax)
+        watermark && LegendMakie.add_watermarks!(; final, kwargs...)
+
+        fig
+    end
+
+
+    function LegendMakie.lplot!(
+            report::NamedTuple{(:par, :f_fit, :x, :y, :gof, :e_unit, :type)}; 
+            additional_pts::NamedTuple = NamedTuple(), kwargs...
+        )
+
+        if report.type != :cal
+            @warn "Unknown calibration type $(report.type), no plot generated."
+            return Makie.current_figure()
+        end
+                 
+        LegendMakie.lplot!(
+            report[(:par, :f_fit, :x, :y, :gof)],
+            additional_pts = if !isempty(additional_pts)
+                # strip the units from the additional points
+                μ_strip = Unitful.unit(first(additional_pts.μ)) != Unitful.NoUnits ? Unitful.ustrip.(report.e_unit, additional_pts.μ) : additional_pts.μ
+                p_strip = Unitful.unit(first(additional_pts.peaks)) != Unitful.NoUnits ? Unitful.ustrip.(report.e_unit, additional_pts.peaks) : additional_pts.peaks    
+                μ_cal = report.f_fit.(μ_strip)
+                (x = μ_strip, y = p_strip, residuals_norm = (Measurements.value.(μ_cal) .- Measurements.value.(p_strip))./ Measurements.uncertainty.(μ_cal))
+            else
+                NamedTuple()
+            end,
+            xlabel = "Energy (ADC)", ylabel = "Energy ($(report.e_unit))", xlims = (0, 1.1*Measurements.value(maximum(report.x))); kwargs...
+        )
+    end
+
 end
