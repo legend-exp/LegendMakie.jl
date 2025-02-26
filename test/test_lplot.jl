@@ -39,7 +39,7 @@ using Test
         end
 
         @testset "Energy calibration" begin
-            ecal = filter(x -> x <= 262_000, vcat(rand(Distributions.Exponential(70_000),97_500), 261_450 .+ 200 .* randn(2_000), 210_350 .+ 150 .* randn(300), 159_300 .+ 100 .* randn(200)))
+            ecal = filter(x -> x <= 265_000, vcat(rand(Distributions.Exponential(70_000),97_000), 261_450 .+ 200 .* randn(2_000), 210_350 .+ 185 .* randn(500), 159_300 .+ 170 .* randn(500)))
             lines = [:Tl208DEP, :Tl208SEP, :Tl208FEP]
             energies = [1592.513, 2103.512, 2614.511]u"keV"
             result_simple, report_simple = LegendSpecFits.simple_calibration(ecal, energies, [25, 25, 35]u"keV", [25, 25, 30]u"keV", calib_type = :th228)
@@ -56,6 +56,12 @@ using Test
             result_calib, report_calib = LegendSpecFits.fit_calibration(1, μ_fit, energies)
             @testset "Fit energy calibration" begin
                 @test_nowarn lplot(report_calib, xerrscaling=10, yerrscaling=10, additional_pts=(μ = [100_000], peaks = [1000u"keV"]), title = "Test")
+            end
+            f_cal_widths(x) = report_calib.f_fit(x) .* report_calib.e_unit .- first(report_calib.par)
+            fwhm_fit = f_cal_widths.(getfield.(getindex.(Ref(result_fit), lines), :fwhm))
+            result_fwhm, report_fwhm = LegendSpecFits.fit_fwhm(1, energies, fwhm_fit, uncertainty=true)
+            @testset "FWHM energy calibration" begin
+                @test_nowarn lplot(report_fwhm, additional_pts=(peaks = [1000u"keV"], fwhm = [3.5u"keV"]), title = "Test")
             end
         end
 
