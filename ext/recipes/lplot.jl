@@ -60,17 +60,22 @@ end
 
 function LegendMakie.lplot!(
         report::NamedTuple{(:v, :h, :f_fit, :f_components, :gof)};
-        xlabel = "", ylabel = "Counts / bin",
+        xlabel = "Energy (keV)", ylabel = "Counts / bin",
         title::AbstractString = "", legend_position = :lt,
-        xlims = extrema(first(report.h.edges)), ylims = (0.9,maximum(report.h.weights) * 2),
+        xlims = extrema(first(report.h.edges)), 
+        ylims = let (_min, _max) = extrema(filter(x -> x > 0, report.h.weights))
+            scale = (_max/_min)^(1/4)
+            (_min / sqrt(scale), _max * scale)
+        end,
         show_label::Bool = true, show_components::Bool = true, yticks = Makie.automatic,
-        watermark::Bool = true, show_residuals::Bool = true, col::Int = 1, kwargs...
+        watermark::Bool = true, show_residuals::Bool = true, row::Int = 1, col::Int = 1, kwargs...
     )
 
+    
     fig = Makie.current_figure()
 
     # create plot
-    g = Makie.GridLayout(fig[1,col])
+    g = Makie.GridLayout(fig[row,col])
     ax = Makie.Axis(g[1,1], 
         title = title, titlefont = :bold, titlesize = 16pt, 
         xlabel = xlabel, ylabel = ylabel, yticks = yticks,
@@ -78,7 +83,7 @@ function LegendMakie.lplot!(
         yscale = Makie.log10
     )
 
-    Makie.hist!(ax, StatsBase.midpoints(first(report.h.edges)), weights = report.h.weights, bins = first(report.h.edges), color = LegendMakie.DiamondGrey, label = "Data")
+    Makie.hist!(ax, StatsBase.midpoints(first(report.h.edges)), weights = report.h.weights, bins = first(report.h.edges), color = LegendMakie.DiamondGrey, label = "Data", fillto = 1e-2)
     Makie.lines!(range(xlims..., length = 1000), x -> report.f_fit(x) * step(first(report.h.edges)), color = :black, label = ifelse(show_label, "Best Fit" * (!isempty(report.gof) ? " (p = $(round(report.gof.pvalue, digits=2)))" : ""), ""))
                 
     if show_components
@@ -155,27 +160,25 @@ function LegendMakie.lplot!(
     Makie.vlines!(ax, [fep_guess], color = :red, label = "FEP Guess", linewidth = 1.5)
     Makie.axislegend(ax, position = :ct)
     
+    # add watermarks
     Makie.current_axis!(ax)
     watermark && LegendMakie.add_watermarks!(; final, kwargs...)
     
     fig
 end
 
-
-
-
 # A/E
 function LegendMakie.lplot!( 
         report::NamedTuple{(:par, :f_fit, :x, :y, :gof, :e_unit, :label_y, :label_fit)}; 
         title::AbstractString = "", show_residuals::Bool = true,
         xticks = 500:250:2250, xlims = (500,2300), ylims = nothing,
-        legend_position = :rt, col = 1, watermark::Bool = false, kwargs...
+        legend_position = :rt, row::Int = 1, col::Int = 1, watermark::Bool = false, kwargs...
     )
 
     fig = Makie.current_figure()
 
     # create plot
-    g = Makie.GridLayout(fig[1,col])
+    g = Makie.GridLayout(fig[row,col])
     ax = Makie.Axis(g[1,1], 
         title = title, titlefont = :bold, titlesize = 16pt, 
         xlabel = "E ($(report.e_unit))", ylabel = report.label_y * " (a.u.)", 
@@ -268,12 +271,12 @@ end
 function LegendMakie.lplot!( 
         report::NamedTuple{(:par, :f_fit, :x, :y, :gof, :e_unit, :label_y, :label_fit)},
         com_report::NamedTuple{(:values, :label_y, :label_fit, :energy)};
-        legend_position = :rt, col = 1, kwargs...
+        legend_position = :rt, row::Int = 1, col::Int = 1, kwargs...
     )
 
     fig = LegendMakie.lplot!(report, legend_position = :none, col = col; kwargs...)
 
-    g = last(Makie.contents(fig[1,col]))
+    g = last(Makie.contents(fig[row,col]))
     ax = Makie.contents(g)[1]
     Makie.lines!(ax, com_report.energy, com_report.values, linewidth = 4, color = :red, linestyle = :dash, label = LaTeXStrings.latexstring("\\fontfamily{Roboto}" * com_report.label_fit))
     Makie.axislegend(ax, position = legend_position)
@@ -333,20 +336,36 @@ function LegendMakie.lplot!(
     fig
 end
 
-function LegendMakie.lplot!(args...; watermark::Bool = false, kwargs...)
+
+# Dict of reports (vertical alignment)
+function LegendMakie.lplot!(
+        reports::Dict{Symbol, NamedTuple}; title::AbstractString = "", 
+        watermark::Bool = true, final::Bool = true, kwargs...
+    )
 
     fig = Makie.current_figure()
 
-    #create plot
-    ax = if !isnothing(Makie.current_axis())
-        Makie.current_axis()
-    else
-        Makie.Axis(fig[1,1],
-            titlesize = 18,
-            titlegap = 1,
-            titlealign = :right
-        )
+    isempty(reports) && throw(ArgumentError("Cannot plot empty dictionary."))
+    
+    for (i,(k,report)) in enumerate(reports)
+        LegendMakie.lplot!(report, title = string(k), row = i, watermark = false; kwargs...)
     end
+
+    # add general title
+    if title != ""
+        Makie.Label(fig[1,:,Makie.Top()], title, padding = (0,0,35,0), fontsize = 24, font = :bold)
+    end
+
+    # add watermarks
+    Makie.current_axis!(first(fig.content))
+    watermark && LegendMakie.add_watermarks!(; final, kwargs...)
+
+    fig
+end
+
+
+# fallback method: use Makie.plot!
+function LegendMakie.lplot!(args...; watermark::Bool = false, kwargs...)
 
     # use built-in method as fallback if existent, tweak appearance
     Makie.plot!(args...; kwargs...)
@@ -354,5 +373,5 @@ function LegendMakie.lplot!(args...; watermark::Bool = false, kwargs...)
     # add watermarks
     watermark && LegendMakie.add_watermarks!(; kwargs...)
 
-    fig
+    Makie.current_figure()
 end

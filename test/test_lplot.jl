@@ -38,11 +38,18 @@ using Test
             @test_nowarn lplot(report, xlabel = "x")
         end
 
-        @testset "Simple energy calibration" begin
-            ecal = vcat(rand(Distributions.Exponential(40_000),90_000), 261_450 .+ 1_000 .* randn(1_000))
-            _, report_simple = LegendSpecFits.simple_calibration(ecal, [2614.511u"keV"], [35u"keV"], [30u"keV"], calib_type = :th228)
-            @test_nowarn lplot(report_simple)
-            @test_nowarn lplot(report_simple, cal = false)
+        @testset "Energy calibration" begin
+            ecal = vcat(rand(Distributions.Exponential(50_000),97_500), 261_450 .+ 200 .* randn(2_000), 210_350 .+ 150 .* randn(300), 159_300 .+ 100 .* randn(200))
+            result_simple, report_simple = LegendSpecFits.simple_calibration(ecal, [1592.513, 2103.512, 2614.511]u"keV", [25, 25, 35]u"keV", [25, 25, 30]u"keV", calib_type = :th228)
+            @testset "Simple energy calibration" begin
+                @test_nowarn lplot(report_simple)
+                @test_nowarn lplot(report_simple, cal = false)
+            end
+            m_cal_simple = result_simple.c
+            result_fit, report_fit = LegendSpecFits.fit_peaks(result_simple.peakhists, result_simple.peakstats, [:Tl208DEP, :Tl208SEP, :Tl208FEP]; e_unit=result_simple.unit, calib_type=:th228, m_cal_simple=m_cal_simple)
+            @testset "Fit energy calibration" begin
+                @test_nowarn lplot(report_fit, figsize = (600, 400*length(report_fit)), title = "Test title")
+            end
         end
 
         @testset "A/E correction" begin
