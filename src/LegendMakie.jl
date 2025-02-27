@@ -15,14 +15,12 @@ module LegendMakie
 
     include("lplot.jl")
 
-    include("extdefs_rdsignals.jl")
-
     include("register_extdeps.jl")
 
     function __init__()
-        _register_extension_deps(
-            some_custom_waveform_plot => :RadiationDetectorSignals,
-        )
+        # _register_extension_deps(
+        #     some_custom_waveform_plot => :RadiationDetectorSignals,
+        # )
     end
 
 end # module
