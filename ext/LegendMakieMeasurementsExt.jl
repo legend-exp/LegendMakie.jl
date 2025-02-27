@@ -216,4 +216,66 @@ module LegendMakieMeasurementsExt
         fig
     end
 
+    LegendMakie.lplot!(report::NamedTuple{(:peak, :n_before, :n_after, :sf, :before, :after)}; kwargs...) = LegendMakie.lplot!(report.after; kwargs...)
+        
+    function LegendMakie.lplot!(
+            report::NamedTuple{((:survived, :cut, :sf, :bsf))};
+            xlims::Tuple{<:Real, <:Real} = extrema(first(report.survived.h.edges)), 
+            xticks = (ceil(first(xlims)/10)*10):10:(floor(last(xlims)/10)*10),
+            ylims = nothing, row::Int = 1, col::Int = 1, xlabel = "Energy (keV)",
+            title::AbstractString = "", yscale = Makie.log10, show_residuals::Bool = true, kwargs...
+        )
+            
+        fig = Makie.current_figure()
+        g = Makie.GridLayout(fig[row,col])
+        
+        if isnothing(ylims)
+            ylim_max = 1.5 * max(
+                Measurements.value(report.survived.f_fit(report.survived.v.μ)), 
+                Measurements.value(report.cut.f_fit(report.cut.v.μ)),
+                maximum(report.survived.h.weights), maximum(report.cut.h.weights)
+            )
+            ylim_max = ifelse(iszero(ylim_max), nothing, max(1.2e2, ylim_max))
+            ylim_min = 0.5 * min(minimum(filter(x -> x > 0, report.survived.h.weights)), minimum(filter(x -> x > 0, report.cut.h.weights)))
+            ylims = (ylim_min, ylim_max)
+        end
+
+        ax = Makie.Axis(g[1,1], yticks = (exp10.(0:10), "1" .* join.(fill.("0", 0:10))), 
+            ylabel = "Counts / $(round(step(first(report.survived.h.edges)), digits=2)) keV", 
+            limits = (xlims, ylims); yscale, xlabel, title, xticks)
+        
+        Makie.plot!(ax, report.survived.h, color = (:gray, 0.5), label = "Data Survived", fillto = 0.5)
+        Makie.lines!(ax, range(xlims..., length = 1000), x -> report.survived.f_fit(x) * step(first(report.survived.h.edges)), color = :black, label = "Best Fit" * (!isempty(report.survived.gof) ? " (p = $(round(report.survived.gof.pvalue, digits=2)))" : ""))
+        Makie.plot!(ax, report.cut.h, color = (:lightgray, 0.5), label = "Data Cut", fillto = 0.5)
+        Makie.lines!(ax, range(xlims..., length = 1000), x -> report.cut.f_fit(x) * step(first(report.cut.h.edges)), color = (:gray, 0.5), label = "Best Fit" * (!isempty(report.cut.gof) ? " (p = $(round(report.cut.gof.pvalue, digits=2)))" : ""))
+        Makie.axislegend(ax, position = :lt)
+
+        if !isempty(report.survived.gof) && show_residuals
+            ax2 = Makie.Axis(g[2,1], limits = (extrema(first(report.survived.h.edges)), (-5,5)), xlabel = xlabel, xticks = xticks, ylabel = "Residuals (σ)")
+            LegendMakie.residualplot!(ax2,(x = report.survived.gof.bin_centers, residuals_norm = report.survived.gof.residuals_norm), color = (:black, 0.5))
+            Makie.scatter!(report.cut.gof.bin_centers, report.cut.gof.residuals_norm, color = (:darkgray, 0.7))
+
+            ax.xticklabelsize = 0
+            ax.xticksize = 0
+            ax.xlabel = ""        
+
+            Makie.linkxaxes!(ax, ax2)
+            Makie.rowgap!(g, 0)
+            Makie.rowsize!(g, 1, Makie.Auto(3))
+
+            # align ylabels
+            yspace = maximum(Makie.tight_yticklabel_spacing!, (ax, ax2))
+            ax.yticklabelspace = yspace
+            ax2.yticklabelspace = yspace
+
+            if row == 1
+                Makie.current_axis!(ax)
+                LegendMakie.add_watermarks!(final = true)
+            end
+        end
+        
+        fig
+    end
+
+
 end
