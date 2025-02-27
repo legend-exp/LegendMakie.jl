@@ -9,8 +9,8 @@ end
 function LegendMakie.lplot!(
         report::NamedTuple{(:f_fit, :h, :μ, :σ, :gof)};
         title::AbstractString = "", show_residuals::Bool = true,
-        xlabel = "", xticks = -4:2:4, xlims = (-5,5), ylims = (0,nothing),
-        legend_position = :lt, watermark::Bool = true, kwargs...
+        xlabel = "", xticks = Makie.automatic, xlims = nothing, ylims = (0,nothing),
+        legend_position = :lt, watermark::Bool = true, final::Bool = (title != ""), kwargs...
     )
 
     fig = Makie.current_figure()
@@ -24,7 +24,7 @@ function LegendMakie.lplot!(
     # Create histogram
     Makie.plot!(ax, report.h, label = "Data")
     
-    _x = range(minimum(xlims), stop = maximum(xlims), length = 1000)
+    _x = range(extrema(first(report.h.edges))..., length = 1000)
     Makie.lines!(_x, report.f_fit.(_x), color = :red, 
         label = "Normal Fit\nμ = $(round_wo_units(report.μ, digits=2))\nσ = $(round_wo_units(report.σ, digits=2))")
     
@@ -52,7 +52,7 @@ function LegendMakie.lplot!(
 
     # add watermarks
     Makie.current_axis!(ax)
-    watermark && LegendMakie.add_watermarks!(; kwargs...)
+    watermark && LegendMakie.add_watermarks!(; final, kwargs...)
     
     fig
 end
@@ -68,7 +68,8 @@ function LegendMakie.lplot!(
             (_min / sqrt(scale), _max * scale)
         end,
         show_label::Bool = true, show_components::Bool = true, yticks = Makie.automatic,
-        watermark::Bool = true, show_residuals::Bool = true, row::Int = 1, col::Int = 1, kwargs...
+        watermark::Bool = true, final::Bool = (title != ""),
+        show_residuals::Bool = true, row::Int = 1, col::Int = 1, kwargs...
     )
 
     
@@ -127,7 +128,7 @@ function LegendMakie.lplot!(
 
     # add watermarks
     Makie.current_axis!(ax)
-    watermark && LegendMakie.add_watermarks!(; kwargs...)
+    watermark && LegendMakie.add_watermarks!(; final, kwargs...)
 
     fig
 end
@@ -172,7 +173,8 @@ function LegendMakie.lplot!(
         report::NamedTuple{(:par, :f_fit, :x, :y, :gof, :e_unit, :label_y, :label_fit)}; 
         title::AbstractString = "", show_residuals::Bool = true,
         xticks = 500:250:2250, xlims = (500,2300), ylims = nothing,
-        legend_position = :rt, row::Int = 1, col::Int = 1, watermark::Bool = false, kwargs...
+        legend_position = :rt, row::Int = 1, col::Int = 1, 
+        watermark::Bool = false, final::Bool = (title != ""), kwargs...
     )
 
     fig = Makie.current_figure()
@@ -216,7 +218,7 @@ function LegendMakie.lplot!(
 
     # add watermarks
     Makie.current_axis!(ax)
-    watermark && LegendMakie.add_watermarks!(; kwargs...)
+    watermark && LegendMakie.add_watermarks!(; final, kwargs...)
 
     fig 
 end
@@ -285,8 +287,8 @@ function LegendMakie.lplot!(
 end
 
 function LegendMakie.lplot!( 
-        report::NamedTuple{(:peak, :window, :fct, :bin_width, :bin_width_qdrift, :aoe_peak, :aoe_ctc, :qdrift_peak, :h_before, :h_after, :σ_before, :σ_after, :report_before, :report_after)},
-        label_before = "Before correction", label_after = "After correction", watermark::Bool = true, kwargs...
+        report::NamedTuple{(:peak, :window, :fct, :bin_width, :bin_width_qdrift, :aoe_peak, :aoe_ctc, :qdrift_peak, :h_before, :h_after, :σ_before, :σ_after, :report_before, :report_after)};
+        label_before = "Before correction", label_after = "After correction", title::AbstractString = "", watermark::Bool = true, kwargs...
     )
 
     # Best results for figsize (600,600)
@@ -328,6 +330,11 @@ function LegendMakie.lplot!(
     yspace = maximum(Makie.tight_yticklabel_spacing!, (ax, ax2))
     ax.yticklabelspace = yspace
     ax2.yticklabelspace = yspace
+
+    # add general title
+    if title != ""
+        Makie.Label(g[1,:,Makie.Top()], title, padding = (0,0,2,0), fontsize = 20, font = :bold)
+    end
     
     # add watermarks
     Makie.current_axis!(ax3)

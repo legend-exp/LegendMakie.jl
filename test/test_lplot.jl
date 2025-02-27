@@ -112,7 +112,7 @@ using Test
             qdrift_e = max.(0, randn(10_000) .+ 5)
             @test length(e_cal) == length(aoe_corr) == length(qdrift_e) == 10_000
             result_aoe_ctc, report_aoe_ctc = LegendSpecFits.ctc_aoe(aoe_corr, e_cal, qdrift_e, [E0-10u"keV"])
-            @test_nowarn lplot(report_aoe_ctc, figsize = (600,600))
+            @test_nowarn lplot(report_aoe_ctc, figsize = (600,600), title = "Test")
         end
 
         @testset "Parameter plots" begin
