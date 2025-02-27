@@ -1,15 +1,20 @@
 # This file is a part of LegendMakie.jl, licensed under the MIT License (MIT).
 
-
 function round_wo_units(x::Unitful.RealOrRealQuantity; digits::Int=2)
     Unitful.unit(x) == Unitful.NoUnits ? round(x; digits) : round(Unitful.unit(x), x; digits)
 end
+
+function LegendMakie.default_xlims(report::NamedTuple{(:f_fit, :h, :μ, :σ, :gof)})
+    Unitful.ustrip.((report.μ - 5*report.σ, report.μ + 5*report.σ))
+end
+
 
 # single fits
 function LegendMakie.lplot!(
         report::NamedTuple{(:f_fit, :h, :μ, :σ, :gof)};
         title::AbstractString = "", show_residuals::Bool = true,
-        xlabel = "", xticks = Makie.automatic, xlims = nothing, ylims = (0,nothing),
+        ylims = (0,nothing), xlabel = "", xticks = Makie.automatic, 
+        xlims = LegendMakie.default_xlims(report), 
         legend_position = :lt, watermark::Bool = true, final::Bool = (title != ""), kwargs...
     )
 
@@ -24,7 +29,7 @@ function LegendMakie.lplot!(
     # Create histogram
     Makie.plot!(ax, report.h, label = "Data")
     
-    _x = range(extrema(first(report.h.edges))..., length = 1000)
+    _x = range(extrema(xlims)..., length = 1000)
     Makie.lines!(_x, report.f_fit.(_x), color = :red, 
         label = "Normal Fit\nμ = $(round_wo_units(report.μ, digits=2))\nσ = $(round_wo_units(report.σ, digits=2))")
     
@@ -56,7 +61,6 @@ function LegendMakie.lplot!(
     
     fig
 end
-
 
 function LegendMakie.lplot!(
         report::NamedTuple{(:v, :h, :f_fit, :f_components, :gof)};
