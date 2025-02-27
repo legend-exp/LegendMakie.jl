@@ -36,6 +36,9 @@ using Test
         @testset "Singlefits" begin
             result, report = LegendSpecFits.fit_single_trunc_gauss(randn(10000), (low = -4.0, high = 4.0, max = NaN))
             @test_nowarn lplot(report, xlabel = "x")
+
+            result, report = LegendSpecFits.fit_single_trunc_gauss(randn(10000), uncertainty = false)
+            @test_nowarn lplot(report, xlabel = "Test")
         end
 
         @testset "Energy calibration" begin
