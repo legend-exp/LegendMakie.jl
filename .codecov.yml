@@ -1,1 +1,3 @@
 # comment: false
+ignore:
+  - "src/register_extdeps.jl"
