@@ -25,6 +25,7 @@ export lsavefig
 
 # recipes
 function residualplot! end
+function energycalibrationplot! end
 function aoecorrectionplot! end
 function parameterplot! end
 
