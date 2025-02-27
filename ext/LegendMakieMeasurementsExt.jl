@@ -11,6 +11,13 @@ module LegendMakieMeasurementsExt
 
     import LegendMakie: pt, aoecorrectionplot!, energycalibrationplot!
 
+    # extends LegendMakie.default_xlims in LegendMakieExt.jl
+    # for the cases where μ and σ have uncertainties
+    function LegendMakie.default_xlims(report::NamedTuple{(:f_fit, :h, :μ, :σ, :gof),<:Tuple{Any,Any,M,M,Any}}
+        ) where {M <: Union{Measurements.Measurement, Unitful.Quantity{<:Measurements.Measurement}}}
+        Unitful.ustrip.(Measurements.value.((report.μ - 5*report.σ, report.μ + 5*report.σ)))
+    end
+
     # function to compose labels when errorbars are scaled
     function label_errscaling(xerrscaling::Real, yerrscaling::Real)
         result = String[]
