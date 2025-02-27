@@ -66,6 +66,12 @@ using Test
             @testset "FWHM energy calibration" begin
                 @test_nowarn lplot(report_fwhm, additional_pts=(peaks = [1000u"keV"], fwhm = [3.5u"keV"]), title = "Test")
             end
+            @testset "Throw warning for wrong report types" begin
+                report_calib_faulty = NamedTuple{keys(report_calib)}((k == :type) ? (:faulty) : report_calib[k] for k in keys(report_calib))
+                report_fwhm_faulty = NamedTuple{keys(report_fwhm)}((k == :type) ? (:faulty) : report_fwhm[k] for k in keys(report_fwhm))
+                @test_logs (:warn,) lplot(report_calib_faulty, xerrscaling=10, yerrscaling=10, additional_pts=(μ = [100_000], peaks = [1000u"keV"]), title = "Test")
+                @test_logs (:warn,) lplot(report_fwhm_faulty, xerrscaling=10, yerrscaling=10, additional_pts=(μ = [100_000], peaks = [1000u"keV"]), title = "Test")
+            end
         end
 
         @testset "A/E correction" begin
@@ -125,6 +131,9 @@ using Test
             chinfo = LegendDataManagement.channelinfo(l200, filekey, system = :geds)
             pd = PropDicts.PropDict(Dict(Symbol.(det.name) => det.production.mass_in_g for det in dets))
             @test_nowarn LegendMakie.lplot(chinfo, pd)
+            # delete the last entry to test handling missing detectors
+            delete!(pd, :V99000A)
+            @test_logs (:warn,) LegendMakie.lplot(chinfo, pd)
         end
     end
 end
