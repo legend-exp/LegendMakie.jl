@@ -63,14 +63,14 @@ end
 
 
 function LegendMakie.add_watermarks!(;
-        legend_logo::Bool = false, juleana_logo::Bool = true,
+        legend_logo::Bool = false, juleana_logo::Bool = true, position::String = "outer right",
         preliminary::Bool = true, approved::Bool = false, final::Bool = false,
         kwargs...
     )
     if legend_logo
-        LegendMakie.add_legend_logo!()
+        LegendMakie.add_legend_logo!(; position)
     elseif juleana_logo
-        LegendMakie.add_juleana_logo!()
+        LegendMakie.add_juleana_logo!(; position)
     end
 
     if !final && preliminary

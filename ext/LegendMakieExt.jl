@@ -20,6 +20,7 @@ module LegendMakieExt
 
     include("recipes/recipes.jl")
     include("recipes/lplot.jl")
+    include("recipes/lhist.jl")
     include("recipes/watermarks.jl")
 
     function __init__()
@@ -43,6 +44,13 @@ module LegendMakieExt
         # create new Figure
         fig = Makie.Figure(size = figsize)
         LegendMakie.lplot!(args...; kwargs...)
+        fig
+    end
+
+    function LegendMakie.lhist(args...; figsize = Makie.theme(:size), kwargs...)
+        # create new Figure
+        fig = Makie.Figure(size = figsize)
+        LegendMakie.lhist!(args...; kwargs...)
         fig
     end
 
