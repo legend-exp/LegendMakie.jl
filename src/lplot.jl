@@ -14,6 +14,18 @@ export lplot, lplot!
 
 
 """
+    lplot(objs...)
+    lplot!(objs...)
+
+Plots `objs` via Makie in a LEGEND-specific form/style into a new histogram.
+
+"""
+function lhist end
+function lhist! end
+export lhist, lhist!
+
+
+"""
     lsavefig(filename)
 
 Saves the current figure to a file with a given `filename`.
