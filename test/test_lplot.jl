@@ -82,6 +82,10 @@ using Test
             myσ(E) = sqrt(σA^2 + σB^2/E^2)
             aoe = [let _μ = myμ(E), _σ = myσ(E); (rand() < 0.2 ? -rand(Distributions.Exponential(5*_σ)) : 0) + _σ*randn() + _μ; end for E in e_cal]
 
+            # A/E vs. E 2D histogram
+            h_aoe = StatsBase.fit(StatsBase.Histogram, (e_cal, aoe), (0:0.5:3000, 0.1:5e-3:1.8))
+            @test_nowarn lhist(h_aoe, rasterize = true, title = "Test")
+
             compton_bands = collect((550:50:2350)u"keV")
             compton_window = 20u"keV"
             compton_band_peakhists = LegendSpecFits.generate_aoe_compton_bands(aoe, e_cal*u"keV", compton_bands, compton_window)
