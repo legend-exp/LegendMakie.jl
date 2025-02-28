@@ -124,6 +124,15 @@ using Test
             @test_nowarn lplot(report_aoe_ctc, figsize = (600,600), title = "Test")
         end
 
+        @testset "A/E survival fraction plots" begin
+            # generate fake A/E and E distribution
+            aoe = vcat(randn(30_000), randn(70_000) .- 10)
+            e_cal = 1.5u"keV" .* randn(100_000) .+ 2614.5u"keV"
+            result_peaks_ds, report_peaks_ds = LegendSpecFits.get_peaks_survival_fractions(
+                aoe, e_cal, [2614.5u"keV"], [:Tl208FEP], [(35.0u"keV",35.0u"keV")], -5.0)
+            @test_nowarn LegendMakie.lplot(report_peaks_ds[:Tl208FEP], title = "Test")
+        end
+
         @testset "Parameter plots" begin
             l200 = LegendDataManagement.LegendData(:l200)
             filekey = LegendDataManagement.start_filekey(l200, :p02, :r000, :cal)
