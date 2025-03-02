@@ -17,6 +17,17 @@ import Unitful: @u_str
 
 using Test
 
+@testset "lsavefig" begin
+    fn = "test.pdf"
+    isfile(fn) && rm(file)
+    @test_throws ArgumentError lsavefig(fn)
+    @test !isfile(fn)
+    lplot(StatsBase.fit(StatsBase.Histogram, randn(10000)))
+    @test_nowarn lsavefig(fn)
+    @test isfile(fn)
+    rm(fn)
+end
+
 @testset "lplot" begin
     @testset "Test watermarks" begin
 
