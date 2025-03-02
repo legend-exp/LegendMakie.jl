@@ -1,7 +1,7 @@
 # This file is a part of LegendMakie.jl, licensed under the MIT License (MIT).
 
 using LegendMakie
-using Makie
+using Makie, CairoMakie
 
 import LegendSpecFits
 import LegendDataManagement
@@ -18,14 +18,19 @@ import Unitful: @u_str
 using Test
 
 @testset "lsavefig" begin
-    fn = "test.pdf"
-    isfile(fn) && rm(file)
-    @test_throws ArgumentError lsavefig(fn)
-    @test !isfile(fn)
-    lplot(StatsBase.fit(StatsBase.Histogram, randn(10000)))
-    @test_nowarn lsavefig(fn)
-    @test isfile(fn)
-    rm(fn)
+    # Empty figures cannot be plotted
+    @test_throws ArgumentError lsavefig("empty.pdf")
+    @test !isfile("empty.pdf")
+    for fileformat in ("pdf", "png", "svg")
+        @testset "Fileformat: $(fileformat)" begin 
+            fn = "test.$(fileformat)"
+            isfile(fn) && rm(file)
+            Makie.scatter(rand(10), rand(10))
+            @test_nowarn lsavefig(fn)
+            @test isfile(fn)
+            rm(fn)
+        end
+    end
 end
 
 @testset "lplot" begin
