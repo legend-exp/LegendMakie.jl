@@ -42,6 +42,7 @@ end
         ax2 = Axis(fig[1,2])
         @test_nowarn LegendMakie.residualplot!(ax2, (x = 1:10, residuals_norm = randn(10)))
         @test_nowarn LegendMakie.add_watermarks!(legend_logo = true, position = "outer top", preliminary = false)
+        @test_throws ArgumentError LegendMakie.add_watermarks!(position = "Test")
     end
 
     @testset "Test LegendSpecFits reports" begin
@@ -89,7 +90,7 @@ end
             end
             result_fit, report_fit = LegendSpecFits.fit_peaks(result_simple.peakhists, result_simple.peakstats, lines; e_unit=result_simple.unit, calib_type=:th228, m_cal_simple=m_cal_simple)
             @testset "Fit peaks for energy calibration" begin
-                @test_nowarn lplot(report_fit, figsize = (600, 400*length(report_fit)), watermark = false)
+                @test_nowarn lplot(report_fit, figsize = (600, 400*length(report_fit)), watermark = false, title = "Test")
             end
             μ_fit = getfield.(getindex.(Ref(result_fit), lines), :centroid)
             result_calib, report_calib = LegendSpecFits.fit_calibration(1, μ_fit, energies)
