@@ -1,7 +1,7 @@
 # This file is a part of LegendMakie.jl, licensed under the MIT License (MIT).
 
 using LegendMakie
-using Makie
+using Makie, CairoMakie
 
 import LegendSpecFits
 import LegendDataManagement
@@ -17,6 +17,22 @@ import Unitful: @u_str
 
 using Test
 
+@testset "lsavefig" begin
+    # Empty figures cannot be plotted
+    @test_throws ArgumentError lsavefig("empty.pdf")
+    @test !isfile("empty.pdf")
+    for fileformat in ("pdf", "png", "svg")
+        @testset "Fileformat: $(fileformat)" begin 
+            fn = "test.$(fileformat)"
+            isfile(fn) && rm(file)
+            Makie.scatter(rand(10), rand(10))
+            @test_nowarn lsavefig(fn)
+            @test isfile(fn)
+            rm(fn)
+        end
+    end
+end
+
 @testset "lplot" begin
     @testset "Test watermarks" begin
 
@@ -31,6 +47,7 @@ using Test
         ax2 = Axis(fig[1,2])
         @test_nowarn LegendMakie.residualplot!(ax2, (x = 1:10, residuals_norm = randn(10)))
         @test_nowarn LegendMakie.add_watermarks!(legend_logo = true, position = "outer top", preliminary = false)
+        @test_throws ArgumentError LegendMakie.add_watermarks!(position = "Test")
     end
 
     @testset "Test LegendSpecFits reports" begin
@@ -78,7 +95,7 @@ using Test
             end
             result_fit, report_fit = LegendSpecFits.fit_peaks(result_simple.peakhists, result_simple.peakstats, lines; e_unit=result_simple.unit, calib_type=:th228, m_cal_simple=m_cal_simple)
             @testset "Fit peaks for energy calibration" begin
-                @test_nowarn lplot(report_fit, figsize = (600, 400*length(report_fit)), watermark = false)
+                @test_nowarn lplot(report_fit, figsize = (600, 400*length(report_fit)), watermark = false, title = "Test")
             end
             μ_fit = getfield.(getindex.(Ref(result_fit), lines), :centroid)
             result_calib, report_calib = LegendSpecFits.fit_calibration(1, μ_fit, energies)

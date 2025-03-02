@@ -18,9 +18,13 @@ module LegendMakie
     include("register_extdeps.jl")
 
     function __init__()
-        # _register_extension_deps(
-        #     some_custom_waveform_plot => :RadiationDetectorSignals,
-        # )
+        _register_extension_deps(
+            lplot => :Makie,
+            lplot! => :Makie,
+            lhist => :Makie,
+            lhist! => :Makie,
+            lsavefig => :Makie
+        )
     end
 
 end # module
