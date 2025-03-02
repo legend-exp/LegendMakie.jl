@@ -290,6 +290,65 @@ function LegendMakie.lplot!(
     fig
 end
 
+function LegendMakie.lplot!(
+        report::NamedTuple{(:peak, :window, :fct, :bin_width, :bin_width_qdrift, :e_peak, :e_ctc, :qdrift_peak, :h_before, :h_after, :fwhm_before, :fwhm_after, :report_before, :report_after)};
+        label_before = "Before correction", label_after = "After correction", title::AbstractString = "", watermark::Bool = true, 
+        xlims = extrema(first(report.h_before.edges)), e_unit = u"keV", kwargs...
+    )
+
+    # Best results for figsize (600,600)
+    fig = Makie.current_figure()
+
+    g = Makie.GridLayout(fig[1,1])
+
+    ax = Makie.Axis(g[1,1], limits = (xlims...,0,nothing), ylabel = "Counts / $(round(step(first(report.h_before.edges)), digits = 2))")
+    Makie.plot!(ax, report.h_before, color = :darkgrey, label = label_before)
+    Makie.plot!(ax, report.h_after, color = (:purple, 0.5), label = label_after)
+    Makie.axislegend(position = :lt)
+
+    ax2 = Makie.Axis(g[2,1], limits = (xlims...,0,1-1e-5), xticks = 2400:10:2630, yticks = 0:0.2:1, xlabel = "Energy ($e_unit)", ylabel = "Qdrift / E (a.u.)")
+    k_before = KernelDensity.kde((Unitful.ustrip.(e_unit, report.e_peak), report.qdrift_peak ./ maximum(report.qdrift_peak)))
+    k_after = KernelDensity.kde((Unitful.ustrip.(e_unit, report.e_ctc), report.qdrift_peak ./ maximum(report.qdrift_peak)))
+    Makie.contourf!(ax2, k_before.x, k_before.y, k_before.density, levels = 15, colormap = :binary)
+    Makie.contour!(ax2, k_before.x, k_before.y, k_before.density, levels = 15 - 1, color = :white)
+    Makie.contour!(ax2, k_after.x, k_after.y, k_after.density, levels = 15 - 1, colormap = :plasma)
+    Makie.lines!(ax2, [0], [0], label = label_before, color = :darkgrey)
+    Makie.lines!(ax2, [0], [0], label = label_after, color = (:purple, 0.5))
+    Makie.axislegend(position = :lb)
+
+    ax3 = Makie.Axis(g[2,2], limits = (0,nothing,0,1-1e-5), xlabel = "Counts / 0.1")
+    Makie.plot!(ax3, StatsBase.fit(StatsBase.Histogram, report.qdrift_peak ./ maximum(report.qdrift_peak), 0:0.01:1), color = :darkgrey, label = "Before correction", direction = :x)
+    ax3.xticks = Makie.WilkinsonTicks(3, k_min = 3, k_max=4)
+
+    # Formatting
+    Makie.linkxaxes!(ax,ax2)
+    Makie.hidexdecorations!(ax)
+    Makie.rowgap!(g, 0)
+    Makie.rowsize!(g, 1, Makie.Auto(0.5))
+    Makie.linkyaxes!(ax2,ax3)
+    Makie.hideydecorations!(ax3)
+    Makie.colgap!(g, 0)
+    Makie.colsize!(g, 2, Makie.Auto(0.5))
+    xspace = maximum(Makie.tight_xticklabel_spacing!, (ax2, ax3))
+    ax2.xticklabelspace = xspace
+    ax3.xticklabelspace = xspace
+    yspace = maximum(Makie.tight_yticklabel_spacing!, (ax, ax2))
+    ax.yticklabelspace = yspace
+    ax2.yticklabelspace = yspace
+
+    # add general title
+    if title != ""
+        Makie.Label(g[1,:,Makie.Top()], title, padding = (0,0,2,0), fontsize = 20, font = :bold)
+    end
+
+    # add watermarks
+    Makie.current_axis!(ax3)
+    watermark && LegendMakie.add_watermarks!(; kwargs...)
+
+    fig
+end
+
+
 function LegendMakie.lplot!( 
         report::NamedTuple{(:peak, :window, :fct, :bin_width, :bin_width_qdrift, :aoe_peak, :aoe_ctc, :qdrift_peak, :h_before, :h_after, :σ_before, :σ_after, :report_before, :report_after)};
         label_before = "Before correction", label_after = "After correction", title::AbstractString = "", watermark::Bool = true, kwargs...
