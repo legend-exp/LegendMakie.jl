@@ -51,6 +51,10 @@ using Test
                 @test_nowarn lplot(report_simple, cal = false)
             end
             m_cal_simple = result_simple.c
+            result_ctc, report_ctc = LegendSpecFits.ctc_energy(ecal .* m_cal_simple, rand(length(ecal)), 2614.5u"keV", (5u"keV", 5u"keV"), m_cal_simple)
+            @testset "Test energy CTC" begin
+                @test_nowarn lplot(report_ctc, figsize = (600,600), title = "Test")
+            end
             result_fit, report_fit = LegendSpecFits.fit_peaks(result_simple.peakhists, result_simple.peakstats, lines; e_unit=result_simple.unit, calib_type=:th228, m_cal_simple=m_cal_simple)
             @testset "Fit peaks for energy calibration" begin
                 @test_nowarn lplot(report_fit, figsize = (600, 400*length(report_fit)), watermark = false)
