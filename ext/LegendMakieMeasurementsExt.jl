@@ -277,5 +277,55 @@ module LegendMakieMeasurementsExt
         fig
     end
 
+    function LegendMakie.lplot!(
+            report::NamedTuple{(:rt, :min_enc, :enc_grid_rt, :enc)};
+            title::AbstractString = "", xunit = Unitful.unit(first(report.enc_grid_rt)),
+            xlims = Unitful.ustrip.(xunit, extrema(report.enc_grid_rt) .+ (-1, 1) .* (report.enc_grid_rt[2] - report.enc_grid_rt[1])),
+            watermark::Bool = true, final::Bool = (title != ""), kwargs...
+        )
+        
+        fig = Makie.current_figure()
+        
+        ax = Makie.Axis(fig[1,1], 
+            title = title, 
+            limits = (xlims, nothing),
+            xlabel = "Rise Time ($xunit)", ylabel = "ENC (ADC)")
+
+        Makie.errorbars!(ax, Unitful.ustrip.(xunit, report.enc_grid_rt), Measurements.value.(report.enc), Measurements.uncertainty.(report.enc))
+        Makie.scatter!(ax, Unitful.ustrip.(xunit, report.enc_grid_rt), Measurements.value.(report.enc), label = "ENC")
+        Makie.hlines!(ax, [Measurements.value(report.min_enc)], color = :red, label = "Min. ENC noise (RT: $(report.rt))")
+        Makie.band!(ax, [xlims...], (Measurements.value(report.min_enc) .+ (-1,1) .* Measurements.uncertainty(report.min_enc))..., color = (:red,0.2))
+        Makie.axislegend(ax)
+
+        Makie.current_axis!(ax)
+        LegendMakie.add_watermarks!(; final, kwargs...)
+        fig
+    end
+
+    function LegendMakie.lplot!(
+            report::NamedTuple{(:ft, :min_fwhm, :e_grid_ft, :fwhm)};
+            title::AbstractString = "", xunit = Unitful.unit(first(report.e_grid_ft)), yunit = Unitful.unit(first(report.fwhm)),
+            xlims = Unitful.ustrip.(xunit, extrema(report.e_grid_ft) .+ (-1, 1) .* (report.e_grid_ft[2] - report.e_grid_ft[1])),
+            ylims = (1,8), watermark::Bool = true, final::Bool = (title != ""), kwargs...
+        )
+        
+        fig = Makie.current_figure()
+        
+        ax = Makie.Axis(fig[1,1], 
+            title = title, 
+            limits = (xlims, ylims),
+            xlabel = "Flat-Top Time ($xunit)", ylabel = "FWHM ($yunit)")
+
+        Makie.errorbars!(ax, Unitful.ustrip.(xunit, report.e_grid_ft), Unitful.ustrip.(yunit, Measurements.value.(report.fwhm)), Unitful.ustrip.(yunit, Measurements.uncertainty.(report.fwhm)))
+        Makie.scatter!(ax, Unitful.ustrip.(xunit, report.e_grid_ft), Unitful.ustrip.(yunit, Measurements.value.(report.fwhm)), label = "FWHM")
+        Makie.hlines!(ax, [Unitful.ustrip.(yunit, Measurements.value(report.min_fwhm))], color = :red, label = "Min. FWHM: $(round(yunit, Measurements.value(report.min_fwhm), digits = 2)) (FT: $(report.ft))")
+        Makie.band!(ax, [xlims...], Unitful.ustrip.(yunit, (Measurements.value(report.min_fwhm) .+ (-1,1) .* Measurements.uncertainty(report.min_fwhm)))..., color = (:red,0.2))
+        Makie.axislegend(ax)
+
+        Makie.current_axis!(ax)
+        LegendMakie.add_watermarks!(; final, kwargs...)
+        fig
+    end
+
 
 end
