@@ -10,6 +10,7 @@ testdata_dir = joinpath(LegendTestData.legend_test_data_path(), "data", "legend"
 ENV["LEGEND_DATA_CONFIG"] = joinpath(testdata_dir, "config.json")
 
 import Distributions
+import Measurements
 import PropDicts
 import StatsBase
 import Unitful: @u_str
@@ -39,6 +40,26 @@ using Test
 
             result, report = LegendSpecFits.fit_single_trunc_gauss(randn(10000), uncertainty = false)
             @test_nowarn lplot(report, xlabel = "Test")
+        end
+
+        @testset "Filter optimization" begin
+            # Did not manage to call the function, so generate fake report
+            enc_grid_rt = (1.5:0.5:16.0)u"μs"
+            enc = Measurements.measurement.(rand(length(enc_grid_rt)) .+ 1.0, rand(length(enc_grid_rt)))
+            min_enc, idx = findmin(enc)
+            rt = Measurements.measurement(enc_grid_rt[idx], step(enc_grid_rt))
+            report_rt = (; rt, min_enc, enc_grid_rt, enc)
+            @testset "ENC vs. Rise Time" begin
+                @test_nowarn LegendMakie.lplot(report_rt, title = "Test")
+            end
+            e_grid_ft = (1.5:0.5:16.0)u"μs"
+            fwhm = Measurements.measurement.(rand(length(e_grid_ft)) .* 5.0 .+ 2.0, rand(length(e_grid_ft)))u"keV"
+            min_fwhm, idx = findmin(fwhm)
+            ft = Measurements.measurement(e_grid_ft[idx], step(e_grid_ft))
+            report_ft = (; ft, min_fwhm, e_grid_ft, fwhm)
+            @testset "FWHM vs. Flat-Top Time" begin
+                @test_nowarn LegendMakie.lplot(report_ft, title = "Test")
+            end
         end
 
         @testset "Energy calibration" begin
