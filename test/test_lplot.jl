@@ -179,6 +179,19 @@ end
             @test_nowarn LegendMakie.lplot(report_peaks_ds[:Tl208FEP], title = "Test")
         end
 
+        @testset "LQ plots" begin
+            e_cal = filter(x -> x <= 2650u"keV", vcat(rand(Distributions.Exponential(700),97_000)u"keV", 2614.5u"keV" .+ 2u"keV" .* randn(2_000), 2103.5u"keV" .+ 1.85u"keV" .* randn(500), 1593.5u"keV" .+ 1.7u"keV" .* randn(500)))
+            dt_eff = rand(length(e_cal))*10 .+ 3
+            lq_e_corr = filter(x -> -20 < x < 20, clamp.(rand(Distributions.Cauchy(1.0, 0.5), 2*length(e_cal)),-20,20))[eachindex(e_cal)] .+ dt_eff .* 0.01
+            drift_result, drift_report = LegendSpecFits.lq_ctc_correction(lq_e_corr, dt_eff, e_cal, 1593.5u"keV", 1.5u"keV")
+            result, report = LegendSpecFits.lq_cut(1593.5u"keV", 1.5u"keV", e_cal, lq_e_corr)
+            @test_nowarn lplot(drift_report, e_cal, dt_eff, lq_e_corr, :whole, title = "Test", figsize = (620,400))
+            @test_nowarn lplot(drift_report, e_cal, dt_eff, lq_e_corr, :DEP, title = "Test", figsize = (620,400))
+            @test_nowarn lplot(report.temp_hists, title = "Test")
+            @test_nowarn lplot((; e_cal, edges = report.edges, dep_σ = report.dep_σ), title = "Test")
+            @test_nowarn lplot((; e_cal, lq_class = lq_e_corr, cut_value = report.cut), figsize = (750,400), title = "Test")
+        end
+
         @testset "Parameter plots" begin
             l200 = LegendDataManagement.LegendData(:l200)
             filekey = LegendDataManagement.start_filekey(l200, :p02, :r000, :cal)
