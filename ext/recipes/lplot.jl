@@ -33,7 +33,9 @@ function LegendMakie.lplot!(
     Makie.lines!(_x, report.f_fit.(_x), color = :red, 
         label = "Normal Fit\nμ = $(round_wo_units(report.μ, digits=2))\nσ = $(round_wo_units(report.σ, digits=2))")
     
-    Makie.axislegend(ax, position = legend_position)
+    if legend_position != :none 
+        Makie.axislegend(ax, position = legend_position)
+    end
     
     if !isempty(report.gof) && show_residuals
 
@@ -404,6 +406,134 @@ function LegendMakie.lplot!(
     watermark && LegendMakie.add_watermarks!(; kwargs...)
     
     fig
+end
+
+# LQ plots
+function LegendMakie.lplot!(
+        report::NamedTuple{(:hist_dep, :hist_sb1, :hist_sb2, :hist_subtracted, :hist_corrected)};
+        title::AbstractString = "", xlabel = "LQ (a.u.)", ylabel = "Counts", legend_position = :rt,
+        xlims = nothing, ylims = (0, nothing), final::Bool = !isempty(title),
+        watermark::Bool = true, kwargs...
+    )
+    
+    fig = Makie.current_figure()
+    ax = Makie.Axis(fig[1,1]; limits = (xlims, ylims), title, xlabel, ylabel)
+    
+    let h = report.hist_dep, h1 = report.hist_sb1, h2 = report.hist_sb2
+    Makie.stephist!(ax, StatsBase.midpoints(first(h.edges)), bins = first(h.edges), weights = h.weights, label = "Peak")
+    Makie.stephist!(ax, StatsBase.midpoints(first(h1.edges)), bins = first(h1.edges), weights = h1.weights, label = "Sideband 1")
+    Makie.stephist!(ax, StatsBase.midpoints(first(h2.edges)), bins = first(h2.edges), weights = h2.weights, label = "Sideband 2")
+    end
+    
+    legend_position != :none && Makie.axislegend(position = legend_position)
+    
+    watermark && LegendMakie.add_watermarks!(; final, kwargs...)
+    fig
+end
+
+function LegendMakie.lplot!(
+        report::NamedTuple{(:e_cal, :lq_class, :cut_value)};
+        title::AbstractString = "", e_unit = Unitful.unit(first(report.e_cal)), 
+        xlabel = "Energy ($e_unit)", ylabel = "Counts", yscale = Makie.log10,
+        watermark::Bool = true, final::Bool = !isempty(title), kwargs...
+    )
+    
+    # best results for figsize = (750,400)
+    fig = Makie.current_figure()
+    
+    h = StatsBase.fit(StatsBase.Histogram, Unitful.ustrip.(e_unit, report.e_cal), 0:1:3000)
+    ax = Makie.Axis(fig[1,1],
+        limits = ((0,2700), (1,maximum(h.weights)*1.2));
+        title, xlabel, ylabel = ylabel * " / $(e_unit)", yscale
+    )
+
+    Makie.stephist!(ax, Unitful.ustrip.(e_unit, report.e_cal), bins = 0:1:3000,  color = (LegendMakie.AchatBlue, 0.5),  label = "Before LQ")
+    Makie.stephist!(ax, Unitful.ustrip.(e_unit, report.e_cal)[report.lq_class .> report.cut_value], bins = 0:1:3000, color = (LegendMakie.BEGeOrange, 1),  label = "Cut by LQ")
+    Makie.stephist!(ax, Unitful.ustrip.(e_unit, report.e_cal)[report.lq_class .<= report.cut_value], bins = 0:1:3000, color = (LegendMakie.CoaxGreen, 0.7), label = "Surviving LQ")
+    Makie.axislegend(ax, position = (0.96,1))
+
+    # add inset
+    h_in = StatsBase.fit(StatsBase.Histogram, Unitful.ustrip.(e_unit, report.e_cal), 1583:0.5:1640)
+    ax_inset = Makie.Axis(fig[1,1],
+        width = Makie.Relative(0.4),
+        height = Makie.Relative(0.2),
+        halign = 0.55,
+        valign = 0.95, 
+        yscale = yscale,
+        xlabel = xlabel,
+        ylabel = ylabel,
+        xticks = 1585:10:1645,
+        xlabelsize = 12pt,
+        ylabelsize = 12pt,
+        xticklabelsize = 10pt,
+        yticklabelsize = 10pt,
+        yticks = (exp10.(0:10), "1" .* join.(fill.("0", 0:10))),
+        limits = (extrema(first(h_in.edges)), (0.9, max(100, maximum(h_in.weights)) * 1.2))
+    )
+    Makie.stephist!(ax_inset, Unitful.ustrip.(e_unit, report.e_cal), bins = 1583:0.5:1640,  color = (LegendMakie.AchatBlue, 0.5),  label = "Before A/E")
+    Makie.stephist!(ax_inset, Unitful.ustrip.(e_unit, report.e_cal)[report.lq_class .> report.cut_value],  bins = 1583:0.5:1640, color = (LegendMakie.BEGeOrange, 1.0),  label = "Before A/E")
+    Makie.stephist!(ax_inset, Unitful.ustrip.(e_unit, report.e_cal)[report.lq_class .<= report.cut_value], bins = 1583:0.5:1640, color = (LegendMakie.CoaxGreen, 0.7),  label = "Before A/E")
+
+    Makie.current_axis!(ax)
+    watermark && LegendMakie.add_watermarks!(final = true)
+    
+    fig
+end
+
+function LegendMakie.lplot!(
+        report::NamedTuple{(:e_cal, :edges, :dep_σ)};
+        e_unit = Unitful.unit(first(report.e_cal)), 
+        h = StatsBase.fit(StatsBase.Histogram, Unitful.ustrip.(e_unit, report.e_cal), 1500:1:1650),
+        xlims = extrema(first(h.edges)), ylims = (0, maximum(h.weights)*1.2),
+        title::AbstractString = "", xlabel = "Energy ($e_unit)", ylabel = "Counts / $(e_unit)",
+        legend_position = :lt, watermark::Bool = true, final::Bool = !isempty(title), kwargs...
+    )
+    
+    fig = Makie.current_figure()
+    
+    ax = Makie.Axis(fig[1,1], limits = (xlims, ylims); title, xlabel, ylabel)
+    
+    Makie.stephist!(ax, StatsBase.midpoints(first(h.edges)), weights = h.weights, bins = first(h.edges),
+        label = "Energy Spectrum (σ: $(round(e_unit, report.dep_σ, digits=2)))")
+    Makie.vlines!(ax, Unitful.ustrip.(e_unit, [report.edges.DEP_edge_left, report.edges.DEP_edge_right]), color = LegendMakie.BEGeOrange, label = "DEP region")
+    Makie.vlines!(ax, Unitful.ustrip.(e_unit, [report.edges.sb1_edge, report.edges.sb2_edge]), color = LegendMakie.CoaxGreen, label = "Side bands")
+    
+    Makie.band!(ax, Unitful.ustrip.(e_unit, [report.edges.DEP_edge_left, report.edges.DEP_edge_right]), 0, maximum(h.weights)*1.2, color = (LegendMakie.BEGeOrange, 0.1))
+    Makie.band!(ax, Unitful.ustrip.(e_unit, [min(report.edges.sb1_edge, report.edges.sb2_edge), report.edges.DEP_edge_left]), 0, maximum(h.weights)*1.2, color = (LegendMakie.CoaxGreen, 0.1))
+    if report.edges.sb2_edge > report.edges.sb1_edge 
+        Makie.band!(ax, Unitful.ustrip.(e_unit, [report.edges.DEP_edge_right, report.edges.sb2_edge]), 0, maximum(h.weights)*1.2, color = (LegendMakie.CoaxGreen, 0.1))
+    end
+    
+    legend_position != :none && Makie.axislegend(ax, position = legend_position)
+    
+    Makie.current_axis!(ax)
+    watermark && LegendMakie.add_watermarks!(; final, kwargs...)
+    
+    fig
+end
+
+function LegendMakie.lplot!(
+        report::NamedTuple{(:lq_report, :drift_report, :lq_box, :drift_time_func, :dep_left, :dep_right)},
+        e_cal, dt_eff, lq_e_corr, plot_type::Symbol = :whole;
+        title::AbstractString = "", xlabel = "Drift time (a.u.)", ylabel = "LQ (a.u.)", 
+        colorscale = plot_type == :whole ? Makie.log10 : Makie.identity,
+        watermark::Bool = true, final::Bool = !isempty(title), kwargs...
+    )
+    
+    # best results for figsize = (620,400)
+    sel = isfinite.(e_cal) .&& (plot_type == :whole .|| report.dep_left .< e_cal .< report.dep_right)
+    let l = report.lq_box.t_lower, r = report.lq_box.t_upper, b = report.lq_box.lq_lower, t = report.lq_box.lq_upper
+        xlims = (2l-r, 2r-l)
+        ylims = plot_type == :whole ? (9b-8t, 9t-8b) : (2b-t, 5t-4b)
+        LegendMakie.lhist!(StatsBase.fit(StatsBase.Histogram, (dt_eff[sel], lq_e_corr[sel]), 
+            (range(xlims..., length = (plot_type == :whole ? 200 : 50)), range(ylims..., length = (plot_type == :whole ? 200 : 50))));
+            title, xlabel, ylabel, limits = (xlims, ylims), colorscale,
+            colormap = :viridis, figsize = (620,400), watermark = false)
+        Makie.lines!([l,l,r,r,l],[b,t,t,b,b], color = :red, linewidth = 3)
+        Makie.lines!([2l-r,2r-l], report.drift_time_func.([2l-r,2r-l]), linewidth = 3, color = LegendMakie.BEGeOrange, label = "Linear fit")
+    end
+    Makie.axislegend(position = :lt, framevisible = true, framewidth = 1, framecolor = :lightgray)
+    LegendMakie.add_watermarks!(; position = "outer top", final, kwargs...)
 end
 
 
