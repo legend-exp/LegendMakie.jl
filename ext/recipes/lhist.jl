@@ -26,10 +26,13 @@ function LegendMakie.lhist!(
 
     hm = Makie.heatmap!(ax, h.edges..., replace(h.weights, 0 => NaN); colormap, colorscale)
     hm.rasterize = rasterize
-    cb = Makie.Colorbar(g[1,2], hm, 
-        tickformat = values -> Makie.rich.("10", Makie.superscript.(string.(Int.(log10.(values))))),
-        ticks = exp10.(0:ceil(maximum(log10.(h.weights))))
-    )
+    cb = if colorscale == Makie.log10
+        Makie.Colorbar(g[1,2], hm, 
+            tickformat = values -> Makie.rich.("10", Makie.superscript.(string.(Int.(log10.(values))))),
+            ticks = exp10.(0:ceil(maximum(log10.(h.weights)))))
+    else
+        Makie.Colorbar(g[1,2], hm, minorticksvisible = false)
+    end
 
     # add watermarks
     Makie.current_axis!(ax)

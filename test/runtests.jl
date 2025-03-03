@@ -2,6 +2,9 @@
 
 import Test
 
+# checkout main branch of LegendSpecFits
+import Pkg; Pkg.add(url = "https://github.com/legend-exp/LegendSpecFits.jl", rev="main")
+
 Test.@testset "Package LegendMakie" begin
     include("test_aqua.jl")
     include("test_lplot.jl")

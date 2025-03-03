@@ -108,7 +108,7 @@ module LegendMakieMeasurementsExt
             xlabel = "Energy (ADC)", ylabel = "Energy (calibrated)", title::AbstractString = "",
             show_residuals::Bool = true, plot_ribbon::Bool = true, legend_position = :lt,
             xerrscaling::Real = 1, yerrscaling::Real = 1, row::Int = 1, col::Int = 1,
-            watermark::Bool = true, final::Bool = (title != ""), kwargs...
+            watermark::Bool = true, final::Bool = !isempty(title), kwargs...
         )
         
         fig = Makie.current_figure()
@@ -281,7 +281,7 @@ module LegendMakieMeasurementsExt
             report::NamedTuple{(:rt, :min_enc, :enc_grid_rt, :enc)};
             title::AbstractString = "", xunit = Unitful.unit(first(report.enc_grid_rt)),
             xlims = Unitful.ustrip.(xunit, extrema(report.enc_grid_rt) .+ (-1, 1) .* (report.enc_grid_rt[2] - report.enc_grid_rt[1])),
-            watermark::Bool = true, final::Bool = (title != ""), kwargs...
+            watermark::Bool = true, final::Bool = !isempty(title), kwargs...
         )
         
         fig = Makie.current_figure()
@@ -306,7 +306,7 @@ module LegendMakieMeasurementsExt
             report::NamedTuple{(:ft, :min_fwhm, :e_grid_ft, :fwhm)};
             title::AbstractString = "", xunit = Unitful.unit(first(report.e_grid_ft)), yunit = Unitful.unit(first(report.fwhm)),
             xlims = Unitful.ustrip.(xunit, extrema(report.e_grid_ft) .+ (-1, 1) .* (report.e_grid_ft[2] - report.e_grid_ft[1])),
-            ylims = (1,8), watermark::Bool = true, final::Bool = (title != ""), kwargs...
+            ylims = (1,8), watermark::Bool = true, final::Bool = !isempty(title), kwargs...
         )
         
         fig = Makie.current_figure()
