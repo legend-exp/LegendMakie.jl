@@ -15,7 +15,7 @@ function LegendMakie.lplot!(
         title::AbstractString = "", show_residuals::Bool = true,
         ylims = (0,nothing), xlabel = "", xticks = Makie.automatic, 
         xlims = LegendMakie.default_xlims(report), 
-        legend_position = :lt, watermark::Bool = true, final::Bool = (title != ""), kwargs...
+        legend_position = :lt, watermark::Bool = true, final::Bool = !isempty(title), kwargs...
     )
 
     fig = Makie.current_figure()
@@ -72,7 +72,7 @@ function LegendMakie.lplot!(
             (_min / sqrt(scale), _max * scale)
         end,
         show_label::Bool = true, show_components::Bool = true, yticks = Makie.automatic,
-        watermark::Bool = true, final::Bool = (title != ""),
+        watermark::Bool = true, final::Bool = !isempty(title),
         show_residuals::Bool = true, row::Int = 1, col::Int = 1, kwargs...
     )
 
@@ -141,7 +141,7 @@ end
 function LegendMakie.lplot!(
         report::NamedTuple{(:h_calsimple, :h_uncal, :c, :fep_guess, :peakhists, :peakstats)};
         cal::Bool = true, title::AbstractString = "", yscale = Makie.log10, 
-        final::Bool = (title != ""), watermark::Bool = true, kwargs...
+        final::Bool = !isempty(title), watermark::Bool = true, kwargs...
     )
     
     fig = Makie.current_figure()
@@ -178,7 +178,7 @@ function LegendMakie.lplot!(
         title::AbstractString = "", show_residuals::Bool = true,
         xticks = 500:250:2250, xlims = (500,2300), ylims = nothing,
         legend_position = :rt, row::Int = 1, col::Int = 1, 
-        watermark::Bool = false, final::Bool = (title != ""), kwargs...
+        watermark::Bool = false, final::Bool = !isempty(title), kwargs...
     )
 
     fig = Makie.current_figure()
@@ -337,7 +337,7 @@ function LegendMakie.lplot!(
     ax2.yticklabelspace = yspace
 
     # add general title
-    if title != ""
+    if !isempty(title)
         Makie.Label(g[1,:,Makie.Top()], title, padding = (0,0,2,0), fontsize = 20, font = :bold)
     end
 
@@ -395,7 +395,7 @@ function LegendMakie.lplot!(
     ax2.yticklabelspace = yspace
 
     # add general title
-    if title != ""
+    if !isempty(title)
         Makie.Label(g[1,:,Makie.Top()], title, padding = (0,0,2,0), fontsize = 20, font = :bold)
     end
     
@@ -422,7 +422,7 @@ function LegendMakie.lplot!(
     end
 
     # add general title
-    if title != ""
+    if !isempty(title)
         Makie.Label(fig[1,:,Makie.Top()], title, padding = (0,0,35,0), fontsize = 24, font = :bold)
     end
 
