@@ -141,6 +141,27 @@ end
 
 # Ecal
 function LegendMakie.lplot!(
+        report::NamedTuple{(:f_calib, :h_cal, :h_uncal, :c, :peak_positions, :threshold)},
+        cal_lines::Vector{<:Unitful.Energy} = typeof(1.0u"keV")[];
+        e_unit = u"keV", title::AbstractString = "", xlabel = "Energy ($(e_unit))", ylabel = "Counts / $(round(step(first(report.h_cal.edges)), digits = 2)) keV",
+        yscale = Makie.log10, xlims = (0,3000), ylims = (0.9, maximum(report.h_cal.weights)*1.2),
+        xticks = 0:250:3000, legend_position = :rt,
+        watermark::Bool = true, final::Bool = !isempty(title), kwargs...
+    )
+
+    fig = Makie.current_figure()
+    ax = Makie.Axis(fig[1,1]; limits = (xlims, ylims), title, xticks, xlabel, ylabel, yscale)
+
+    Makie.stephist!(ax, StatsBase.midpoints(first(report.h_cal.edges)), weights = replace(report.h_cal.weights, 0=>1e-10), bins = first(report.h_cal.edges), label = "e_fc")
+    !isempty(cal_lines) && Makie.vlines!(ax, Unitful.ustrip.(e_unit, cal_lines), color = :red, label = "Th228 Calibration Lines")
+    legend_position != :none && Makie.axislegend(ax, position = legend_position, framevisible = true, framecolor = :lightgray)
+        
+    Makie.current_axis!(ax)
+    watermark && LegendMakie.add_watermarks!(; final, kwargs...)
+    fig
+end
+
+function LegendMakie.lplot!(
         report::NamedTuple{(:h_calsimple, :h_uncal, :c, :fep_guess, :peakhists, :peakstats)};
         cal::Bool = true, title::AbstractString = "", yscale = Makie.log10, 
         final::Bool = !isempty(title), watermark::Bool = true, kwargs...
