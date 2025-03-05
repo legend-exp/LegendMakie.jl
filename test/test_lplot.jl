@@ -70,7 +70,7 @@ end
                 @test_nowarn LegendMakie.lplot(report_rt, title = "Test")
             end
             e_grid_ft = (1.5:0.5:16.0)u"μs"
-            fwhm = Measurements.measurement.(rand(length(e_grid_ft)) .* 5.0 .+ 2.0, rand(length(e_grid_ft)))u"keV"
+            fwhm = Measurements.measurement.(rand(length(e_grid_ft)) .* 5.0 .+ 2.0, NaN)u"keV"
             min_fwhm, idx = findmin(fwhm)
             ft = Measurements.measurement(e_grid_ft[idx], step(e_grid_ft))
             report_ft = (; ft, min_fwhm, e_grid_ft, fwhm)

@@ -11,6 +11,10 @@ module LegendMakieMeasurementsExt
 
     import LegendMakie: pt, aoecorrectionplot!, energycalibrationplot!
 
+    function round_wo_units(x::Unitful.RealOrRealQuantity; digits::Int=2)
+        Unitful.unit(x) == Unitful.NoUnits ? round(x; digits) : round(Unitful.unit(x), x; digits)
+    end
+
     # extends LegendMakie.default_xlims in LegendMakieExt.jl
     # for the cases where μ and σ have uncertainties
     function LegendMakie.default_xlims(report::NamedTuple{(:f_fit, :h, :μ, :σ, :gof),<:Tuple{Any,Any,M,M,Any}}
@@ -277,73 +281,28 @@ module LegendMakieMeasurementsExt
         fig
     end
 
+    # filter optimzation plots
     function LegendMakie.lplot!(
-            report::NamedTuple{(:rt, :min_enc, :enc_grid_rt, :enc)};
-            title::AbstractString = "", xunit = Unitful.unit(first(report.enc_grid_rt)),
-            xlims = Unitful.ustrip.(xunit, extrema(report.enc_grid_rt) .+ (-1, 1) .* (report.enc_grid_rt[2] - report.enc_grid_rt[1])),
-            watermark::Bool = true, final::Bool = !isempty(title), kwargs...
-        )
-        
-        fig = Makie.current_figure()
-        
-        ax = Makie.Axis(fig[1,1], 
-            title = title, 
-            limits = (xlims, nothing),
-            xlabel = "Rise Time ($xunit)", ylabel = "ENC (ADC)")
-
-        Makie.errorbars!(ax, Unitful.ustrip.(xunit, report.enc_grid_rt), Measurements.value.(report.enc), Measurements.uncertainty.(report.enc))
-        Makie.scatter!(ax, Unitful.ustrip.(xunit, report.enc_grid_rt), Measurements.value.(report.enc), label = "ENC")
-        Makie.hlines!(ax, [Measurements.value(report.min_enc)], color = :red, label = "Min. ENC noise (RT: $(report.rt))")
-        Makie.band!(ax, [xlims...], (Measurements.value(report.min_enc) .+ (-1,1) .* Measurements.uncertainty(report.min_enc))..., color = (:red,0.2))
-        Makie.axislegend(ax)
-
-        Makie.current_axis!(ax)
-        watermark && LegendMakie.add_watermarks!(; final, kwargs...)
-        fig
-    end
-
-    function LegendMakie.lplot!(
-            report::NamedTuple{(:ft, :min_fwhm, :e_grid_ft, :fwhm)};
-            title::AbstractString = "", xunit = Unitful.unit(first(report.e_grid_ft)), yunit = Unitful.unit(first(report.fwhm)),
-            xlims = Unitful.ustrip.(xunit, extrema(report.e_grid_ft) .+ (-1, 1) .* (report.e_grid_ft[2] - report.e_grid_ft[1])),
-            ylims = (1,8), watermark::Bool = true, final::Bool = !isempty(title), kwargs...
-        )
-        
-        fig = Makie.current_figure()
-        
-        ax = Makie.Axis(fig[1,1], 
-            title = title, 
-            limits = (xlims, ylims),
-            xlabel = "Flat-Top Time ($xunit)", ylabel = "FWHM ($yunit)")
-
-        Makie.errorbars!(ax, Unitful.ustrip.(xunit, report.e_grid_ft), Unitful.ustrip.(yunit, Measurements.value.(report.fwhm)), Unitful.ustrip.(yunit, Measurements.uncertainty.(report.fwhm)))
-        Makie.scatter!(ax, Unitful.ustrip.(xunit, report.e_grid_ft), Unitful.ustrip.(yunit, Measurements.value.(report.fwhm)), label = "FWHM")
-        Makie.hlines!(ax, [Unitful.ustrip.(yunit, Measurements.value(report.min_fwhm))], color = :red, label = "Min. FWHM: $(round(yunit, Measurements.value(report.min_fwhm), digits = 2)) (FT: $(report.ft))")
-        Makie.band!(ax, [xlims...], Unitful.ustrip.(yunit, (Measurements.value(report.min_fwhm) .+ (-1,1) .* Measurements.uncertainty(report.min_fwhm)))..., color = (:red,0.2))
-        Makie.axislegend(ax)
-
-        Makie.current_axis!(ax)
-        watermark && LegendMakie.add_watermarks!(; final, kwargs...)
-        fig
-    end
-
-    function LegendMakie.lplot!(
-            report::NamedTuple{(:wl, :min_sf, :a_grid_wl_sg, :sfs)};
-            title::AbstractString = "", xunit = Unitful.unit(first(report.a_grid_wl_sg)), yunit = Unitful.unit(first(report.sfs)),
-            xlims = Unitful.ustrip.(xunit, extrema(report.a_grid_wl_sg) .+ (-1, 1) .* (report.a_grid_wl_sg[2] - report.a_grid_wl_sg[1])),
+            report::NamedTuple{(:x, :minx, :y, :miny)};
+            title::AbstractString = "", xunit = Unitful.unit(first(report.x)), yunit = Unitful.unit(first(report.y)),
+            xlabel = "", ylabel = "", xlegendlabel = xlabel, ylegendlabel = ylabel, 
+            xlims = Unitful.ustrip.(xunit, extrema(report.x) .+ (-1, 1) .* (report.x[2] - report.x[1])),
             legend_position = :lt, watermark::Bool = true, final::Bool = !isempty(title), kwargs...
         )
-        
-        fig = Makie.current_figure()
-        
-        ax = Makie.Axis(fig[1,1], 
-            title = title, 
-            limits = (xlims, nothing),
-            xlabel = "Window length ($xunit)", ylabel = "SEP survival fraction ($yunit)")
 
-        Makie.errorbars!(ax, Unitful.ustrip.(xunit, report.a_grid_wl_sg), Unitful.ustrip.(yunit, Measurements.value.(report.sfs)), Unitful.ustrip.(yunit, Measurements.uncertainty.(report.sfs)))
-        Makie.scatter!(ax, Unitful.ustrip.(xunit, report.a_grid_wl_sg), Unitful.ustrip.(yunit, Measurements.value.(report.sfs)), label = "SF")
-        Makie.hlines!(ax, [Unitful.ustrip(yunit, Measurements.value(report.min_sf))], color = :red, label = "Min. SF $(round(yunit, Measurements.value(report.min_sf), digits = 2)) (WL: $(report.wl))")
+        fig = Makie.current_figure()
+
+        ax = Makie.Axis(fig[1,1];
+            title, limits = (xlims, nothing),
+            xlabel = (xlabel * ifelse(xunit == Unitful.NoUnits, "", " ($xunit)")) |> typeof(xlabel),
+            ylabel = (ylabel * ifelse(yunit == Unitful.NoUnits, "", " ($yunit)")) |> typeof(ylabel)
+        )
+
+        Makie.errorbars!(ax, Unitful.ustrip.(xunit, report.x), Unitful.ustrip.(yunit, Measurements.value.(report.y)), Unitful.ustrip.(yunit, Measurements.uncertainty.(report.y)))
+        Makie.scatter!(ax, Unitful.ustrip.(xunit, report.x), Unitful.ustrip.(yunit, Measurements.value.(report.y)), label = ylegendlabel)
+        Makie.hlines!(ax, [Unitful.ustrip(yunit, Measurements.value(report.miny))], color = :red, label = "Min. $(ylegendlabel) $(round_wo_units(report.miny, digits = 2)) $yunit ($(xlegendlabel): $(report.minx))")
+        Makie.band!(ax, [xlims...], Unitful.ustrip.(yunit, (Measurements.value(report.miny) .+ (-1,1) .* Measurements.uncertainty(report.miny)))..., color = (:red,0.2))
+        
         legend_position != :none && Makie.axislegend(ax, position = legend_position)
 
         Makie.current_axis!(ax)
@@ -351,5 +310,34 @@ module LegendMakieMeasurementsExt
         fig
     end
 
+    function LegendMakie.lplot!(report::NamedTuple{(:rt, :min_enc, :enc_grid_rt, :enc)}; kwargs...)
+        LegendMakie.lplot!(
+            (x = report.enc_grid_rt, minx = report.rt, y = report.enc, miny = report.min_enc);
+            xlabel = "Rise Time", ylabel = "ENC (ADC)", xlegendlabel = "RT", ylegendlabel = "ENC noise", kwargs...
+        )
+    end
+
+    function LegendMakie.lplot!(report::NamedTuple{(:ft, :min_fwhm, :e_grid_ft, :fwhm)}; kwargs...)
+        LegendMakie.lplot!(
+            (x = report.e_grid_ft, minx = report.ft, y = report.fwhm, miny = report.min_fwhm);
+            xlabel = "Flat-Top Time", ylabel = "FWHM", xlegendlabel = "FT", ylegendlabel = "FWHM", kwargs...
+        )
+    end
+
+    function LegendMakie.lplot!(report::NamedTuple{(:wl, :min_sf, :a_grid_wl_sg, :sfs)}; kwargs...)
+        LegendMakie.lplot!(
+            (x = report.a_grid_wl_sg, minx = report.wl, y = report.sfs, miny = report.min_sf);
+            xlabel = "Window length", ylabel = "SEP survival fraction", xlegendlabel = "WL", ylegendlabel = "SF", kwargs...
+        )
+    end
+
+    function LegendMakie.lplot!(report::NamedTuple{(:wl, :min_obj, :gain, :res_1pe, :pos_1pe, :threshold, :a_grid_wl_sg, :obj, :report_simple, :report_fit)}; kwargs...)
+        LegendMakie.lplot!(
+            (x = report.a_grid_wl_sg, minx = report.wl, y = report.obj, miny = report.min_obj);
+            xlabel = "Window length",
+            ylabel = LaTeXStrings.latexstring("\\fontfamily{Roboto} Objective\\; \$\\frac{\\sigma \\cdot \\sqrt{\\text{threshold}}}{\\text{gain} \\cdot \\sqrt{\\text{pos_-1pe}}}\$"), 
+            xlegendlabel = "WL", ylegendlabel = "Obj", kwargs...
+        )
+    end
 
 end
