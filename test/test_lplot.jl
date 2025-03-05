@@ -77,6 +77,14 @@ end
             @testset "FWHM vs. Flat-Top Time" begin
                 @test_nowarn LegendMakie.lplot(report_ft, title = "Test")
             end
+            a_grid_wl_sg = (30:32.:350)u"ns"
+            sfs = Measurements.measurement.(rand(length(a_grid_wl_sg)), NaN) .* 100u"percent" 
+            min_sf, idx = findmin(sfs)
+            wl = Measurements.measurement(a_grid_wl_sg[idx], step(a_grid_wl_sg))
+            report_wl = (; wl, min_sf, a_grid_wl_sg, sfs)
+            @testset "A/E: SEP SF vs. Window length" begin
+                @test_nowarn LegendMakie.lplot(report_wl, title = "Test")
+            end
         end
 
         @testset "Energy calibration" begin
