@@ -298,7 +298,7 @@ module LegendMakieMeasurementsExt
         Makie.axislegend(ax)
 
         Makie.current_axis!(ax)
-        LegendMakie.add_watermarks!(; final, kwargs...)
+        watermark && LegendMakie.add_watermarks!(; final, kwargs...)
         fig
     end
 
@@ -323,7 +323,31 @@ module LegendMakieMeasurementsExt
         Makie.axislegend(ax)
 
         Makie.current_axis!(ax)
-        LegendMakie.add_watermarks!(; final, kwargs...)
+        watermark && LegendMakie.add_watermarks!(; final, kwargs...)
+        fig
+    end
+
+    function LegendMakie.lplot!(
+            report::NamedTuple{(:wl, :min_sf, :a_grid_wl_sg, :sfs)};
+            title::AbstractString = "", xunit = Unitful.unit(first(report.a_grid_wl_sg)), yunit = Unitful.unit(first(report.sfs)),
+            xlims = Unitful.ustrip.(xunit, extrema(report.a_grid_wl_sg) .+ (-1, 1) .* (report.a_grid_wl_sg[2] - report.a_grid_wl_sg[1])),
+            legend_position = :lt, watermark::Bool = true, final::Bool = !isempty(title), kwargs...
+        )
+        
+        fig = Makie.current_figure()
+        
+        ax = Makie.Axis(fig[1,1], 
+            title = title, 
+            limits = (xlims, nothing),
+            xlabel = "Window length ($xunit)", ylabel = "SEP survival fraction ($yunit)")
+
+        Makie.errorbars!(ax, Unitful.ustrip.(xunit, report.a_grid_wl_sg), Unitful.ustrip.(yunit, Measurements.value.(report.sfs)), Unitful.ustrip.(yunit, Measurements.uncertainty.(report.sfs)))
+        Makie.scatter!(ax, Unitful.ustrip.(xunit, report.a_grid_wl_sg), Unitful.ustrip.(yunit, Measurements.value.(report.sfs)), label = "SF")
+        Makie.hlines!(ax, [Unitful.ustrip(yunit, Measurements.value(report.min_sf))], color = :red, label = "Min. SF $(round(yunit, Measurements.value(report.min_sf), digits = 2)) (WL: $(report.wl))")
+        legend_position != :none && Makie.axislegend(ax, position = legend_position)
+
+        Makie.current_axis!(ax)
+        watermark && LegendMakie.add_watermarks!(; final, kwargs...)
         fig
     end
 
