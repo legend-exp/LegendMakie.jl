@@ -12,7 +12,7 @@ function (hint::_WeakDepNotLoadedErrorHint)(io, exc, _, _)
     if exc.f === func && (Base.get_extension(thismodule, ext_name) === nothing)
         deplist = join(hint.weakdeps, ", ")
         quoted_deplist = join(["`$dep`" for dep in hint.weakdeps], ", ")
-        print(io, "\nNOTE: Using `$func` requires $quoted_deplist to be loaded to activate `$ext_name`, e.g. via `import $deplist`.")
+        print(io, "\nNOTE: Using `$func` requires $quoted_deplist to be loaded to activate `$ext_name`, e.g. via `using $deplist` or `import $deplist`.")
     end
 end
  
