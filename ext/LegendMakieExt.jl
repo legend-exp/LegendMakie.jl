@@ -56,7 +56,11 @@ module LegendMakieExt
 
     function LegendMakie.lsavefig(name::AbstractString; kwargs...)
         fig = Makie.current_figure()
-        isnothing(fig) && throw(ArgumentError("No figure to save to file."))
+        isnothing(fig) && throw(MethodError("No figure to save to file."))
+        LegendMakie.lsavefig(fig, name; kwargs...)
+    end
+
+    function LegendMakie.lsavefig(fig::Makie.Figure, name::AbstractString; kwargs...)
         FileIO.save(name, fig; kwargs...)
     end
 end

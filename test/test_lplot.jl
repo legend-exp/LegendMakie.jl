@@ -19,7 +19,7 @@ using Test
 
 @testset "lsavefig" begin
     # Empty figures cannot be plotted
-    @test_throws ArgumentError lsavefig("empty.pdf")
+    @test_throws MethodError lsavefig("empty.pdf")
     @test !isfile("empty.pdf")
     for fileformat in ("pdf", "png", "svg")
         @testset "Fileformat: $(fileformat)" begin 
