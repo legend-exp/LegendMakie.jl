@@ -619,6 +619,10 @@ function LegendMakie.lplot!(
     fig
 end
 
+function LegendMakie.lplot!(h::StatsBase.Histogram{<:Real,1}; kwargs...)
+    LegendMakie.lhist!(h; kwargs...)
+end
+
 
 # fallback method: use Makie.plot!
 function LegendMakie.lplot!(args...; watermark::Bool = false, kwargs...)
