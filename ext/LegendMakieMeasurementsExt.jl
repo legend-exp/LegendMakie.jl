@@ -7,9 +7,16 @@ module LegendMakieMeasurementsExt
     import LaTeXStrings
     import Makie
     import Measurements
+    import StatsBase
     import Unitful
 
     import LegendMakie: pt, aoecorrectionplot!, energycalibrationplot!
+
+    # Default color palette
+    function get_default_color(i::Int)
+        colors = Makie.wong_colors()
+        colors[(i - 1) % end + 1]
+    end
 
     function round_wo_units(x::Unitful.RealOrRealQuantity; digits::Int=2)
         Unitful.unit(x) == Unitful.NoUnits ? round(x; digits) : round(Unitful.unit(x), x; digits)
@@ -23,7 +30,7 @@ module LegendMakieMeasurementsExt
     end
 
     # function to compose labels when errorbars are scaled
-    function label_errscaling(xerrscaling::Real, yerrscaling::Real)
+    function label_errscaling(xerrscaling::Real, yerrscaling::Real = 1)
         result = String[]
         xerrscaling != 1 && push!(result, "x-Error ×$(xerrscaling)")
         yerrscaling != 1 && push!(result, "y-Error ×$(yerrscaling)")
@@ -281,6 +288,86 @@ module LegendMakieMeasurementsExt
         fig
     end
 
+    # SiPM Gaussian Mixture fit
+    function LegendMakie.lplot!(
+            report::NamedTuple{(:h_cal, :f_fit, :f_fit_components, :min_pe, :max_pe, :bin_width, :n_mixtures, :n_pos_mixtures, :peaks, :positions, :μ, :gof)};
+            show_peaks::Bool = true, show_residuals::Bool = true, show_components::Bool = true, show_label::Bool = true,
+            xlims = extrema(first(report.h_cal.edges)), title::AbstractString = "", yscale = Makie.log10,
+            ylims = yscale == Makie.log10 ? (10, maximum(report.h_cal.weights)*4) : (0, maximum(report.h_cal.weights)*1.2),
+            xlabel = "Peak amplitudes (P.E.)", ylabel = "Counts", xerrscaling = 1,
+            row::Int = 1, col::Int = 1, xticks = Makie.automatic, yticks = Makie.automatic,
+            legend_position = :rt, watermark::Bool = true, final::Bool = !isempty(title), kwargs...
+        )
+
+        fig = Makie.current_figure()
+
+        # create plot
+        g = Makie.GridLayout(fig[row,col])
+        ax = Makie.Axis(g[1,1], 
+            title = title, titlefont = :bold, titlesize = 16pt, 
+            limits = (xlims, ylims); xlabel, ylabel, xticks, yticks, yscale
+        )
+
+        Makie.hist!(ax, StatsBase.midpoints(first(report.h_cal.edges)), weights = report.h_cal.weights, bins = first(report.h_cal.edges), color = LegendMakie.DiamondGrey, label = "Amplitudes", fillto = 1e-2)
+        Makie.lines!(range(xlims..., length = 1000), x -> report.f_fit(x), linewidth = 2, color = :black, label = ifelse(show_label, "Best Fit" * (!isempty(report.gof) ? " (p = $(round(report.gof.pvalue, digits=2)))" : ""), nothing))
+
+        # show individual components of the Gaussian mixtures
+        if show_components
+            for i in eachindex(report.μ)
+                f = Base.Fix2(report.f_fit_components, i)
+                Makie.lines!(
+                    range(extrema(first(report.h_cal.edges))..., length = 1000), 
+                    x -> f(x), 
+                    #color = report.f_components.colors[component], 
+                    label = ifelse(show_label && i == firstindex(report.μ) , "Mixture Components", nothing),
+                    color = (get_default_color(i), 0.5),
+                    linestyle = :dash,
+                    linewidth = 2
+                )
+            end
+        end
+
+        # show peak positions as vlines
+        if show_peaks
+            for (i, p) in enumerate(report.positions)
+                Makie.vlines!([Measurements.value(p)], label = "$(report.peaks[i]) P.E. [$(report.n_pos_mixtures[i]) Mix.]" * label_errscaling(xerrscaling,1), linewidth = 1.5)
+                Makie.band!(ax, [(Measurements.value(p) .+ (-1,1) .* xerrscaling .* Measurements.uncertainty(p))...], ylims..., alpha = 0.5)
+            end
+        end
+
+        # add residuals
+        if !isempty(report.gof) && show_residuals
+
+            ax.xticklabelsize = 0
+            ax.xticksize = 0
+            ax.xlabel = ""
+
+            ax2 = Makie.Axis(g[2,1],
+                xlabel = "Peak amplitudes (P.E.)", ylabel = "Residuals (σ)",
+                xticks = xticks, yticks = -3:3:3, limits = (xlims,(-5,5))
+            )
+            LegendMakie.residualplot!(ax2, (x = report.gof.bin_centers, residuals_norm = report.gof.residuals_norm))
+
+            # link axis and put plots together
+            Makie.linkxaxes!(ax, ax2)
+            Makie.rowgap!(g, 0)
+            Makie.rowsize!(g, 1, Makie.Auto(3))
+
+            # align ylabels
+            yspace = maximum(Makie.tight_yticklabel_spacing!, (ax, ax2))
+            ax.yticklabelspace = yspace
+            ax2.yticklabelspace = yspace
+        end
+
+        legend_position != :none && Makie.axislegend(ax, backgroundcolor = (:white, 0.7), framevisible = true, framecolor = :lightgray, position = legend_position)
+
+        # add watermarks
+        Makie.current_axis!(ax)
+        watermark && LegendMakie.add_watermarks!(; final, kwargs...)
+
+        fig
+    end
+
     # filter optimzation plots
     function LegendMakie.lplot!(
             report::NamedTuple{(:x, :minx, :y, :miny)};
@@ -335,7 +422,7 @@ module LegendMakieMeasurementsExt
         LegendMakie.lplot!(
             (x = report.a_grid_wl_sg, minx = report.wl, y = report.obj, miny = report.min_obj);
             xlabel = "Window length",
-            ylabel = LaTeXStrings.latexstring("\\fontfamily{Roboto} Objective\\; \$\\frac{\\sigma \\cdot \\sqrt{\\text{threshold}}}{\\text{gain} \\cdot \\sqrt{\\text{pos_-1pe}}}\$"), 
+            ylabel = LaTeXStrings.latexstring("\\fontfamily{Roboto} Objective\\; \$\\frac{\\sqrt{\\sigma \\cdot \\text{threshold}}}{\\text{gain}}\$"), 
             xlegendlabel = "WL", ylegendlabel = "Obj", kwargs...
         )
     end
