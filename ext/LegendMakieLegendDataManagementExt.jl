@@ -3,7 +3,6 @@
 module LegendMakieLegendDataManagementExt
 
     import LegendMakie
-    import LegendDataManagement
 
     import Format
     import Makie
@@ -12,7 +11,6 @@ module LegendMakieLegendDataManagementExt
     import TypedTables
     import Unitful
 
-    import Unitful: @u_str
     import LegendMakie: pt, parameterplot!
 
 
@@ -90,7 +88,7 @@ module LegendMakieLegendDataManagementExt
         ax.xlabel = p.xlabel[]
         ax.ylabel = ylabel
         ax.xticks = (eachindex(labels) .- 1, labels)
-        ax.xticklabelrotation = 90u"°"
+        ax.xticklabelrotation = π/2
         ax.xgridvisible = true
         ax.ygridvisible = true
         ax.limits = ((0, length(labels)), p.ylims[])

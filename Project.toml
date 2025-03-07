@@ -23,9 +23,9 @@ TypedTables = "9d95f2ec-7b3d-5a63-8d20-e2491e220bb9"
 Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
 
 [extensions]
-LegendMakieExt = ["Makie", "Dates", "FileIO", "Format", "KernelDensity", "LaTeXStrings", "LinearAlgebra", "MathTeXEngine", "StatsBase", "Unitful"]
-LegendMakieLegendDataManagementExt = ["Makie", "LegendDataManagement", "Format", "Measurements", "PropDicts", "TypedTables", "Unitful"]
-LegendMakieMeasurementsExt = ["Makie", "LaTeXStrings", "Measurements", "StatsBase", "Unitful"]
+LegendMakieMakieExt = ["Makie", "Dates", "FileIO", "Format", "MathTeXEngine", "StatsBase"]
+LegendMakieLegendDataManagementExt = ["Makie", "Format", "Measurements", "PropDicts", "TypedTables", "Unitful"]
+LegendMakieLegendSpecFitsExt = ["Makie", "KernelDensity", "LaTeXStrings", "LinearAlgebra", "Measurements", "StatsBase", "Unitful"]
 LegendMakieRadiationDetectorSignalsExt = "RadiationDetectorSignals"
 
 [compat]
