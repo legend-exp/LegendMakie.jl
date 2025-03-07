@@ -595,7 +595,7 @@ end
 
 # Dict of reports (vertical alignment)
 function LegendMakie.lplot!(
-        reports::Dict{Symbol, NamedTuple}; title::AbstractString = "", 
+        reports::Dict{<:Any, NamedTuple}; title::AbstractString = "", 
         watermark::Bool = true, final::Bool = true, kwargs...
     )
 
