@@ -7,16 +7,11 @@ module LegendMakieExt
     import Dates
     import FileIO
     import Format
-    import KernelDensity
-    import LaTeXStrings
-    import LinearAlgebra
     import Makie
     import MathTeXEngine
     import StatsBase
-    import Unitful
     
     import LegendMakie: pt
-    import Unitful: @u_str
 
     include("recipes/recipes.jl")
     include("recipes/lplot.jl")
