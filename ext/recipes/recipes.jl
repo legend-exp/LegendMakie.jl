@@ -6,7 +6,8 @@ Makie.@recipe(ResidualPlot, report) do scene
     Makie.Attributes(
         color_1σ = :darkgrey,
         color_3σ = :lightgrey,
-        color = :black
+        color = :black,
+        markersize = 8
     )
 end
 
@@ -16,6 +17,6 @@ function Makie.plot!(p::ResidualPlot{<:Tuple{NamedTuple{(:x, :residuals_norm)}}}
     res = report.residuals_norm
     Makie.hspan!(p, [-3], [3], color = p.color_3σ)
     Makie.hspan!(p, [-1], [1], color = p.color_1σ)
-    Makie.scatter!(p, xvalues, res, color = p.color)
+    Makie.scatter!(p, xvalues, res, color = p.color, markersize = p.markersize)
     p
 end
