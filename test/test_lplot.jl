@@ -85,6 +85,14 @@ end
             @testset "A/E: SEP SF vs. Window length" begin
                 @test_nowarn LegendMakie.lplot(report_wl, title = "Test")
             end
+            a_grid_wl_sg = (1.5:0.5:16.0)u"μs"
+            obj = Measurements.measurement.(rand(length(a_grid_wl_sg)), rand(length(a_grid_wl_sg)))
+            min_obj, idx = findmin(obj)
+            wl = Measurements.measurement(a_grid_wl_sg[idx], step(a_grid_wl_sg))
+            report_obj = (; wl, min_obj, gain = missing, res_1pe = missing, pos_1pe = missing, threshold = missing, a_grid_wl_sg, obj, report_simple = missing, report_fit = missing)
+            @testset "SiPM: Objective vs. Window length" begin 
+                @test_nowarn LegendMakie.lplot(report_obj, title = "Test")
+            end
         end
 
         @testset "Energy calibration" begin
@@ -202,6 +210,21 @@ end
             @test_nowarn lplot(report.temp_hists, title = "Test")
             @test_nowarn lplot((; e_cal, edges = report.edges, dep_σ = report.dep_σ), title = "Test")
             @test_nowarn lplot((; e_cal, lq_class = lq_e_corr, cut_value = report.cut), figsize = (750,400), title = "Test")
+        end
+
+        @testset "SiPM plots" begin 
+            # generate SiPM thresholds as normal distribution with standard deviation 0
+            result_thres, report_thres = LegendSpecFits.fit_sipm_threshold(randn(100_000), -5.0, 5.0)
+            @test_nowarn LegendMakie.lplot(report_thres, title = "Test")
+
+            # generate fake SiPM amplitude spectrum with 5 P.E. peaks and some background
+            e_uncal = vcat([randn(round(Int, exp10(6-0.5*i))).*0.3 .+ i*1.4 for i in Base.OneTo(5)]..., randn(10000).*1.5 .+ 6)
+            result_simple, report_simple = LegendSpecFits.sipm_simple_calibration(e_uncal, n_fwhm_noise_cut=0.0)
+            result_fit, report_fit = LegendSpecFits.fit_sipm_spectrum(result_simple.pe_simple_cal, 0.5, 4.5, n_mixtures=8,Δpe_peak_assignment=0.5)
+            result_calib, report_calib = LegendSpecFits.fit_calibration(1, result_fit.positions, collect(result_fit.peaks) * u"eV/V")
+            @test_nowarn LegendMakie.lplot(report_simple, title = "Test")
+            @test_nowarn LegendMakie.lplot(report_fit, xerrscaling = 5, title = "Test")
+            @test_nowarn LegendMakie.lplot(report_calib, xerrscaling = 5, title = "Test")
         end
 
         @testset "Parameter plots" begin
