@@ -558,6 +558,41 @@ function LegendMakie.lplot!(
 end
 
 
+# SiPM
+function LegendMakie.lplot!(
+        report::NamedTuple{(:peakpos, :peakpos_cal, :h_uncal, :h_calsimple)};
+        cal::Bool = true, title::AbstractString = "", yscale = Makie.log10,
+        legend_position = :rt, final::Bool = !isempty(title), watermark::Bool = true, kwargs...
+    )
+
+    fig = Makie.current_figure()
+
+    # select correct histogram
+    h = LinearAlgebra.normalize(cal ? report.h_calsimple : report.h_uncal, mode = :density)
+
+    # create main histogram plot
+    ax = Makie.Axis(
+        fig[1,1], 
+        title = title, titlegap = 2,
+        limits = (0, last(first(h.edges)), 0.99*minimum(filter(x -> x > 0, h.weights)), maximum(h.weights)*1.2),
+        xticks = cal ? (0:0.5:last(first(h.edges))) : Makie.automatic,
+        xlabel = "Peak Amplitudes ($(cal ? "P.E." : "ADC"))",
+        ylabel = "Counts / $(round_wo_units(step(first(h.edges)), digits = 2)) $(cal ? "P.E." : "ADC")",
+        yscale = yscale
+    )
+
+    Makie.stephist!(ax, StatsBase.midpoints(first(h.edges)), bins = first(h.edges), weights = h.weights, label = "Amps")
+    Makie.vlines!(ax, cal ? report.peakpos_cal : report.peakpos, color = :red, label = "Peak Pos. Guess", linewidth = 1.5)
+    legend_position != :none && Makie.axislegend(ax, framevisible = true, framewidth = 0, position = legend_position)
+
+    # add watermarks
+    Makie.current_axis!(ax)
+    watermark && LegendMakie.add_watermarks!(; final, kwargs...)
+
+    fig
+end
+
+
 # Dict of reports (vertical alignment)
 function LegendMakie.lplot!(
         reports::Dict{Symbol, NamedTuple}; title::AbstractString = "", 
@@ -582,6 +617,10 @@ function LegendMakie.lplot!(
     watermark && LegendMakie.add_watermarks!(; final, kwargs...)
 
     fig
+end
+
+function LegendMakie.lplot!(h::StatsBase.Histogram{<:Real,1}; kwargs...)
+    LegendMakie.lhist!(h; kwargs...)
 end
 
 

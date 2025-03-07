@@ -40,3 +40,39 @@ function LegendMakie.lhist!(
 
     fig
 end
+
+function LegendMakie.lhist!(
+        h::StatsBase.Histogram{<:Any, 1}; 
+        title::AbstractString = "", xlabel = "", ylabel = "", label = nothing,
+        xticks = Makie.automatic, yticks = Makie.automatic, yscale = Makie.identity,
+        xlims = extrema(first(h.edges)), ylims = (yscale == Makie.log10 ? 0.9 : 0, maximum(h.weights)*1.2),
+        fill::Bool = false, color = LegendMakie.AchatBlue, linewidth = 2, legend_position = :rt,
+        watermark::Bool = true, final::Bool = !isempty(title), kwargs...
+    )
+
+    fig = Makie.current_figure()
+
+    #create plot
+    ax = if isnothing(Makie.current_axis())
+        Makie.Axis(fig[1,1],
+            title = title,
+            titlesize = 18,
+            titlegap = 2,
+            limits = (xlims, ylims);
+            xlabel, ylabel, xticks, yticks, yscale
+        )
+    else
+        Makie.current_axis()
+    end
+
+
+    fill && Makie.hist!(ax, StatsBase.midpoints(first(h.edges)), weights = replace(h.weights, 0 => (yscale == Makie.log10 ? 1e-10 : 0)), bins = first(h.edges), color = (color, 0.5))
+    Makie.stephist!(ax, StatsBase.midpoints(first(h.edges)), weights = replace(h.weights, 0 => (yscale == Makie.log10 ? 1e-10 : 0)), bins = first(h.edges); label, color, linewidth)
+    if legend_position != :none && !isnothing(label)
+        Makie.axislegend(ax, position = legend_position)
+    end
+    Makie.current_axis!(ax)
+    watermark && LegendMakie.add_watermarks!(; final, kwargs...)
+
+    fig
+end

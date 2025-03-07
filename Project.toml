@@ -25,7 +25,7 @@ Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
 [extensions]
 LegendMakieExt = ["Makie", "Dates", "FileIO", "Format", "KernelDensity", "LaTeXStrings", "LinearAlgebra", "MathTeXEngine", "StatsBase", "Unitful"]
 LegendMakieLegendDataManagementExt = ["Makie", "LegendDataManagement", "Format", "Measurements", "PropDicts", "TypedTables", "Unitful"]
-LegendMakieMeasurementsExt = ["Makie", "LaTeXStrings", "Measurements", "Unitful"]
+LegendMakieMeasurementsExt = ["Makie", "LaTeXStrings", "Measurements", "StatsBase", "Unitful"]
 LegendMakieRadiationDetectorSignalsExt = "RadiationDetectorSignals"
 
 [compat]

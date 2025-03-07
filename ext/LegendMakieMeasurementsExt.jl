@@ -7,9 +7,20 @@ module LegendMakieMeasurementsExt
     import LaTeXStrings
     import Makie
     import Measurements
+    import StatsBase
     import Unitful
 
     import LegendMakie: pt, aoecorrectionplot!, energycalibrationplot!
+
+    # Default color palette
+    function get_default_color(i::Int)
+        colors = Makie.wong_colors()
+        colors[(i - 1) % end + 1]
+    end
+
+    function round_wo_units(x::Unitful.RealOrRealQuantity; digits::Int=2)
+        Unitful.unit(x) == Unitful.NoUnits ? round(x; digits) : round(Unitful.unit(x), x; digits)
+    end
 
     # extends LegendMakie.default_xlims in LegendMakieExt.jl
     # for the cases where μ and σ have uncertainties
@@ -19,7 +30,7 @@ module LegendMakieMeasurementsExt
     end
 
     # function to compose labels when errorbars are scaled
-    function label_errscaling(xerrscaling::Real, yerrscaling::Real)
+    function label_errscaling(xerrscaling::Real, yerrscaling::Real = 1)
         result = String[]
         xerrscaling != 1 && push!(result, "x-Error ×$(xerrscaling)")
         yerrscaling != 1 && push!(result, "y-Error ×$(yerrscaling)")
@@ -277,73 +288,108 @@ module LegendMakieMeasurementsExt
         fig
     end
 
+    # SiPM Gaussian Mixture fit
     function LegendMakie.lplot!(
-            report::NamedTuple{(:rt, :min_enc, :enc_grid_rt, :enc)};
-            title::AbstractString = "", xunit = Unitful.unit(first(report.enc_grid_rt)),
-            xlims = Unitful.ustrip.(xunit, extrema(report.enc_grid_rt) .+ (-1, 1) .* (report.enc_grid_rt[2] - report.enc_grid_rt[1])),
-            watermark::Bool = true, final::Bool = !isempty(title), kwargs...
+            report::NamedTuple{(:h_cal, :f_fit, :f_fit_components, :min_pe, :max_pe, :bin_width, :n_mixtures, :n_pos_mixtures, :peaks, :positions, :μ, :gof)};
+            show_peaks::Bool = true, show_residuals::Bool = true, show_components::Bool = true, show_label::Bool = true,
+            xlims = extrema(first(report.h_cal.edges)), title::AbstractString = "", yscale = Makie.log10,
+            ylims = yscale == Makie.log10 ? (10, maximum(report.h_cal.weights)*4) : (0, maximum(report.h_cal.weights)*1.2),
+            xlabel = "Peak amplitudes (P.E.)", ylabel = "Counts", xerrscaling = 1,
+            row::Int = 1, col::Int = 1, xticks = Makie.automatic, yticks = Makie.automatic,
+            legend_position = :rt, watermark::Bool = true, final::Bool = !isempty(title), kwargs...
         )
-        
+
         fig = Makie.current_figure()
-        
-        ax = Makie.Axis(fig[1,1], 
-            title = title, 
-            limits = (xlims, nothing),
-            xlabel = "Rise Time ($xunit)", ylabel = "ENC (ADC)")
 
-        Makie.errorbars!(ax, Unitful.ustrip.(xunit, report.enc_grid_rt), Measurements.value.(report.enc), Measurements.uncertainty.(report.enc))
-        Makie.scatter!(ax, Unitful.ustrip.(xunit, report.enc_grid_rt), Measurements.value.(report.enc), label = "ENC")
-        Makie.hlines!(ax, [Measurements.value(report.min_enc)], color = :red, label = "Min. ENC noise (RT: $(report.rt))")
-        Makie.band!(ax, [xlims...], (Measurements.value(report.min_enc) .+ (-1,1) .* Measurements.uncertainty(report.min_enc))..., color = (:red,0.2))
-        Makie.axislegend(ax)
+        # create plot
+        g = Makie.GridLayout(fig[row,col])
+        ax = Makie.Axis(g[1,1], 
+            title = title, titlefont = :bold, titlesize = 16pt, 
+            limits = (xlims, ylims); xlabel, ylabel, xticks, yticks, yscale
+        )
 
+        Makie.hist!(ax, StatsBase.midpoints(first(report.h_cal.edges)), weights = report.h_cal.weights, bins = first(report.h_cal.edges), color = LegendMakie.DiamondGrey, label = "Amplitudes", fillto = 1e-2)
+        Makie.lines!(range(xlims..., length = 1000), x -> report.f_fit(x), linewidth = 2, color = :black, label = ifelse(show_label, "Best Fit" * (!isempty(report.gof) ? " (p = $(round(report.gof.pvalue, digits=2)))" : ""), nothing))
+
+        # show individual components of the Gaussian mixtures
+        if show_components
+            for i in eachindex(report.μ)
+                f = Base.Fix2(report.f_fit_components, i)
+                Makie.lines!(
+                    range(extrema(first(report.h_cal.edges))..., length = 1000), 
+                    x -> f(x), 
+                    #color = report.f_components.colors[component], 
+                    label = ifelse(show_label && i == firstindex(report.μ) , "Mixture Components", nothing),
+                    color = (get_default_color(i), 0.5),
+                    linestyle = :dash,
+                    linewidth = 2
+                )
+            end
+        end
+
+        # show peak positions as vlines
+        if show_peaks
+            for (i, p) in enumerate(report.positions)
+                Makie.vlines!([Measurements.value(p)], label = "$(report.peaks[i]) P.E. [$(report.n_pos_mixtures[i]) Mix.]" * label_errscaling(xerrscaling,1), linewidth = 1.5)
+                Makie.band!(ax, [(Measurements.value(p) .+ (-1,1) .* xerrscaling .* Measurements.uncertainty(p))...], ylims..., alpha = 0.5)
+            end
+        end
+
+        # add residuals
+        if !isempty(report.gof) && show_residuals
+
+            ax.xticklabelsize = 0
+            ax.xticksize = 0
+            ax.xlabel = ""
+
+            ax2 = Makie.Axis(g[2,1],
+                xlabel = "Peak amplitudes (P.E.)", ylabel = "Residuals (σ)",
+                xticks = xticks, yticks = -3:3:3, limits = (xlims,(-5,5))
+            )
+            LegendMakie.residualplot!(ax2, (x = report.gof.bin_centers, residuals_norm = report.gof.residuals_norm))
+
+            # link axis and put plots together
+            Makie.linkxaxes!(ax, ax2)
+            Makie.rowgap!(g, 0)
+            Makie.rowsize!(g, 1, Makie.Auto(3))
+
+            # align ylabels
+            yspace = maximum(Makie.tight_yticklabel_spacing!, (ax, ax2))
+            ax.yticklabelspace = yspace
+            ax2.yticklabelspace = yspace
+        end
+
+        legend_position != :none && Makie.axislegend(ax, backgroundcolor = (:white, 0.7), framevisible = true, framecolor = :lightgray, position = legend_position)
+
+        # add watermarks
         Makie.current_axis!(ax)
         watermark && LegendMakie.add_watermarks!(; final, kwargs...)
+
         fig
     end
 
+    # filter optimzation plots
     function LegendMakie.lplot!(
-            report::NamedTuple{(:ft, :min_fwhm, :e_grid_ft, :fwhm)};
-            title::AbstractString = "", xunit = Unitful.unit(first(report.e_grid_ft)), yunit = Unitful.unit(first(report.fwhm)),
-            xlims = Unitful.ustrip.(xunit, extrema(report.e_grid_ft) .+ (-1, 1) .* (report.e_grid_ft[2] - report.e_grid_ft[1])),
-            ylims = (1,8), watermark::Bool = true, final::Bool = !isempty(title), kwargs...
-        )
-        
-        fig = Makie.current_figure()
-        
-        ax = Makie.Axis(fig[1,1], 
-            title = title, 
-            limits = (xlims, ylims),
-            xlabel = "Flat-Top Time ($xunit)", ylabel = "FWHM ($yunit)")
-
-        Makie.errorbars!(ax, Unitful.ustrip.(xunit, report.e_grid_ft), Unitful.ustrip.(yunit, Measurements.value.(report.fwhm)), Unitful.ustrip.(yunit, Measurements.uncertainty.(report.fwhm)))
-        Makie.scatter!(ax, Unitful.ustrip.(xunit, report.e_grid_ft), Unitful.ustrip.(yunit, Measurements.value.(report.fwhm)), label = "FWHM")
-        Makie.hlines!(ax, [Unitful.ustrip.(yunit, Measurements.value(report.min_fwhm))], color = :red, label = "Min. FWHM: $(round(yunit, Measurements.value(report.min_fwhm), digits = 2)) (FT: $(report.ft))")
-        Makie.band!(ax, [xlims...], Unitful.ustrip.(yunit, (Measurements.value(report.min_fwhm) .+ (-1,1) .* Measurements.uncertainty(report.min_fwhm)))..., color = (:red,0.2))
-        Makie.axislegend(ax)
-
-        Makie.current_axis!(ax)
-        watermark && LegendMakie.add_watermarks!(; final, kwargs...)
-        fig
-    end
-
-    function LegendMakie.lplot!(
-            report::NamedTuple{(:wl, :min_sf, :a_grid_wl_sg, :sfs)};
-            title::AbstractString = "", xunit = Unitful.unit(first(report.a_grid_wl_sg)), yunit = Unitful.unit(first(report.sfs)),
-            xlims = Unitful.ustrip.(xunit, extrema(report.a_grid_wl_sg) .+ (-1, 1) .* (report.a_grid_wl_sg[2] - report.a_grid_wl_sg[1])),
+            report::NamedTuple{(:x, :minx, :y, :miny)};
+            title::AbstractString = "", xunit = Unitful.unit(first(report.x)), yunit = Unitful.unit(first(report.y)),
+            xlabel = "", ylabel = "", xlegendlabel = xlabel, ylegendlabel = ylabel, 
+            xlims = Unitful.ustrip.(xunit, extrema(report.x) .+ (-1, 1) .* (report.x[2] - report.x[1])),
             legend_position = :lt, watermark::Bool = true, final::Bool = !isempty(title), kwargs...
         )
-        
-        fig = Makie.current_figure()
-        
-        ax = Makie.Axis(fig[1,1], 
-            title = title, 
-            limits = (xlims, nothing),
-            xlabel = "Window length ($xunit)", ylabel = "SEP survival fraction ($yunit)")
 
-        Makie.errorbars!(ax, Unitful.ustrip.(xunit, report.a_grid_wl_sg), Unitful.ustrip.(yunit, Measurements.value.(report.sfs)), Unitful.ustrip.(yunit, Measurements.uncertainty.(report.sfs)))
-        Makie.scatter!(ax, Unitful.ustrip.(xunit, report.a_grid_wl_sg), Unitful.ustrip.(yunit, Measurements.value.(report.sfs)), label = "SF")
-        Makie.hlines!(ax, [Unitful.ustrip(yunit, Measurements.value(report.min_sf))], color = :red, label = "Min. SF $(round(yunit, Measurements.value(report.min_sf), digits = 2)) (WL: $(report.wl))")
+        fig = Makie.current_figure()
+
+        ax = Makie.Axis(fig[1,1];
+            title, limits = (xlims, nothing),
+            xlabel = (xlabel * ifelse(xunit == Unitful.NoUnits, "", " ($xunit)")) |> typeof(xlabel),
+            ylabel = (ylabel * ifelse(yunit == Unitful.NoUnits, "", " ($yunit)")) |> typeof(ylabel)
+        )
+
+        Makie.errorbars!(ax, Unitful.ustrip.(xunit, report.x), Unitful.ustrip.(yunit, Measurements.value.(report.y)), Unitful.ustrip.(yunit, Measurements.uncertainty.(report.y)))
+        Makie.scatter!(ax, Unitful.ustrip.(xunit, report.x), Unitful.ustrip.(yunit, Measurements.value.(report.y)), label = ylegendlabel)
+        Makie.hlines!(ax, [Unitful.ustrip(yunit, Measurements.value(report.miny))], color = :red, label = "Min. $(ylegendlabel) $(round_wo_units(report.miny, digits = 2)) $yunit ($(xlegendlabel): $(report.minx))")
+        Makie.band!(ax, [xlims...], Unitful.ustrip.(yunit, (Measurements.value(report.miny) .+ (-1,1) .* Measurements.uncertainty(report.miny)))..., color = (:red,0.2))
+        
         legend_position != :none && Makie.axislegend(ax, position = legend_position)
 
         Makie.current_axis!(ax)
@@ -351,5 +397,34 @@ module LegendMakieMeasurementsExt
         fig
     end
 
+    function LegendMakie.lplot!(report::NamedTuple{(:rt, :min_enc, :enc_grid_rt, :enc)}; kwargs...)
+        LegendMakie.lplot!(
+            (x = report.enc_grid_rt, minx = report.rt, y = report.enc, miny = report.min_enc);
+            xlabel = "Rise Time", ylabel = "ENC (ADC)", xlegendlabel = "RT", ylegendlabel = "ENC noise", kwargs...
+        )
+    end
+
+    function LegendMakie.lplot!(report::NamedTuple{(:ft, :min_fwhm, :e_grid_ft, :fwhm)}; kwargs...)
+        LegendMakie.lplot!(
+            (x = report.e_grid_ft, minx = report.ft, y = report.fwhm, miny = report.min_fwhm);
+            xlabel = "Flat-Top Time", ylabel = "FWHM", xlegendlabel = "FT", ylegendlabel = "FWHM", kwargs...
+        )
+    end
+
+    function LegendMakie.lplot!(report::NamedTuple{(:wl, :min_sf, :a_grid_wl_sg, :sfs)}; kwargs...)
+        LegendMakie.lplot!(
+            (x = report.a_grid_wl_sg, minx = report.wl, y = report.sfs, miny = report.min_sf);
+            xlabel = "Window length", ylabel = "SEP survival fraction", xlegendlabel = "WL", ylegendlabel = "SF", kwargs...
+        )
+    end
+
+    function LegendMakie.lplot!(report::NamedTuple{(:wl, :min_obj, :gain, :res_1pe, :pos_1pe, :threshold, :a_grid_wl_sg, :obj, :report_simple, :report_fit)}; kwargs...)
+        LegendMakie.lplot!(
+            (x = report.a_grid_wl_sg, minx = report.wl, y = report.obj, miny = report.min_obj);
+            xlabel = "Window length",
+            ylabel = LaTeXStrings.latexstring("\\fontfamily{Roboto} Objective\\; \$\\frac{\\sqrt{\\sigma \\cdot \\text{threshold}}}{\\text{gain}}\$"), 
+            xlegendlabel = "WL", ylegendlabel = "Obj", kwargs...
+        )
+    end
 
 end
