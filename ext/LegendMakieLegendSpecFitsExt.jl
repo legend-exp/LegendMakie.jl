@@ -6,7 +6,6 @@ module LegendMakieLegendSpecFitsExt
 
     import KernelDensity
     import LaTeXStrings
-    import LinearAlgebra
     import Makie
     import Measurements
     import StatsBase
@@ -584,7 +583,7 @@ module LegendMakieLegendSpecFitsExt
         fig = Makie.current_figure()
         
         # select correct histogram
-        h = LinearAlgebra.normalize(cal ? report.h_calsimple : report.h_uncal, mode = :density)
+        h = StatsBase.normalize(cal ? report.h_calsimple : report.h_uncal, mode = :density)
         fep_guess = cal ? 2614.5 : report.fep_guess
 
         # create main histogram plot
@@ -982,7 +981,7 @@ module LegendMakieLegendSpecFitsExt
         fig = Makie.current_figure()
 
         # select correct histogram
-        h = LinearAlgebra.normalize(cal ? report.h_calsimple : report.h_uncal, mode = :density)
+        h = StatsBase.normalize(cal ? report.h_calsimple : report.h_uncal, mode = :density)
 
         # create main histogram plot
         ax = Makie.Axis(
