@@ -34,18 +34,20 @@ using Test
 end
 
 @testset "lplot" begin
+
+    @testset "Test default plot recipe using LegendMakie theme" begin
+        @test_logs (:info,) LegendMakie.lplot(rand(10))
+    end
+
     @testset "Test watermarks" begin
-
-        fig = Figure()
-
         # test default watermark
-        ax = Axis(fig[1,1])
-        lplot!(StatsBase.fit(StatsBase.Histogram, randn(10000)))
+        @test_nowarn LegendMakie.lplot(StatsBase.fit(StatsBase.Histogram, randn(10000)), label = "Test")
         @test_nowarn LegendMakie.add_watermarks!()
 
         # test alternative watermark
-        ax2 = Axis(fig[1,2])
-        @test_nowarn LegendMakie.residualplot!(ax2, (x = 1:10, residuals_norm = randn(10)))
+        fig = Figure()
+        ax = Axis(fig[1,2])
+        @test_nowarn LegendMakie.residualplot!(ax, (x = 1:10, residuals_norm = randn(10)))
         @test_nowarn LegendMakie.add_watermarks!(legend_logo = true, position = "outer top", preliminary = false)
         @test_throws ArgumentError LegendMakie.add_watermarks!(position = "Test")
     end
