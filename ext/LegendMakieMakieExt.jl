@@ -1,6 +1,6 @@
 # This file is a part of LegendMakie.jl, licensed under the MIT License (MIT).
 
-module LegendMakieExt
+module LegendMakieMakieExt
 
     import LegendMakie
 
