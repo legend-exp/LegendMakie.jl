@@ -7,6 +7,7 @@ import Pkg; Pkg.add(url = "https://github.com/legend-exp/LegendSpecFits.jl", rev
 
 Test.@testset "Package LegendMakie" begin
     include("test_aqua.jl")
+    include("test_ext.jl")
     include("test_lplot.jl")
     include("test_rdsignals.jl")
     include("test_docs.jl")
