@@ -3,7 +3,6 @@
 module LegendMakieLegendDataManagementExt
 
     import LegendMakie
-    import LegendDataManagement
 
     import Format
     import Makie
