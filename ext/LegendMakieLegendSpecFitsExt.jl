@@ -575,8 +575,10 @@ module LegendMakieLegendSpecFitsExt
     end
 
     function LegendMakie.lplot!(
-            report::NamedTuple{(:h_calsimple, :h_uncal, :c, :fep_guess, :peakhists, :peakstats)};
+            report::NamedTuple{(:h_calsimple, :h_uncal, :c, :peak_guess, :peakhists, :peakstats)};
             cal::Bool = true, title::AbstractString = "", yscale = Makie.log10, 
+            xlims = (0, cal ? 3000 : 1.2*report.peak_guess), ylims = (0.99*minimum(filter(x -> x > 0, h.weights)), 1.2 * maximum(h.weights)*1.1),
+            xlabel = "Energy ($(cal ? "keV" : "ADC"))", ylabel = "Counts", xticks = cal ? (0:300:3000) : (0:50000:1.2*report.peak_guess),
             final::Bool = !isempty(title), watermark::Bool = true, kwargs...
         )
         
@@ -584,21 +586,18 @@ module LegendMakieLegendSpecFitsExt
         
         # select correct histogram
         h = StatsBase.normalize(cal ? report.h_calsimple : report.h_uncal, mode = :density)
-        fep_guess = cal ? 2614.5 : report.fep_guess
+        peak_guess = cal ? Unitful.ustrip(report.c * report.peak_guess) : report.peak_guess
 
         # create main histogram plot
         ax = Makie.Axis(
-            fig[1,1], 
-            title = title, titlegap = 2,
-            limits = (0, cal ? 3000 : 1.2*report.fep_guess, 0.99*minimum(filter(x -> x > 0, h.weights)), 1.2 * maximum(h.weights)*1.1),
-            xticks = cal ? (0:300:3000) : (0:50000:1.2*report.fep_guess),
-            xlabel = "Energy ($(cal ? "keV" : "ADC"))",
-            ylabel = "Counts",
-            yscale = yscale
+            fig[1,1];
+            title, titlegap = 2,
+            limits = (xlims, ylims),
+            xticks, xlabel, ylabel, yscale
         )
         
         Makie.stephist!(ax, StatsBase.midpoints(first(h.edges)), bins = first(h.edges), weights = h.weights, label = "Energy")
-        Makie.vlines!(ax, [fep_guess], color = :red, label = "FEP Guess", linewidth = 1.5)
+        Makie.vlines!(ax, [peak_guess], color = :red, label = "FEP Guess", linewidth = 1.5)
         Makie.axislegend(ax, position = :ct)
         
         # add watermarks
