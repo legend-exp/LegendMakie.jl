@@ -95,7 +95,7 @@ module LegendMakieLegendSpecFitsExt
         Makie.scatter!(p, xvalues, yvalues, marker = :circle, color = :black, label = "Data" * label_errscaling(xerrscaling, yerrscaling))
         
         # plot additional points
-        if !isempty(additional_pts)
+        if !isempty(additional_pts) && !isempty(additional_pts.x) && !isempty(additional_pts.y)
             xvalues = Measurements.value.(additional_pts.x)
             yvalues = Measurements.value.(additional_pts.y)
             Makie.errorbars!(p, xvalues, yvalues, Measurements.uncertainty.(additional_pts.x) .* xerrscaling, direction = :x, color = :black)
@@ -138,7 +138,7 @@ module LegendMakieLegendSpecFitsExt
             ax2 = Makie.Axis(g[2,1], yticks = -3:3:3, limits = (xlims,(-5,5)), xlabel = xlabel, ylabel = "Residuals (σ)")
             LegendMakie.residualplot!(ax2, (x = Measurements.value.(report.x), residuals_norm = report.gof.residuals_norm))
             # add the additional points
-            if !isempty(additional_pts)
+            if !isempty(additional_pts) && length(additional_pts.x) == length(additional_pts.residuals_norm) > 0
                 Makie.scatter!(ax2, Measurements.value.(additional_pts.x), additional_pts.residuals_norm, 
                         marker = :circle, color = :silver, strokewidth = 1, strokecolor = :black)
             end
@@ -174,7 +174,7 @@ module LegendMakieLegendSpecFitsExt
                  
         LegendMakie.lplot!(
             report[(:par, :f_fit, :x, :y, :gof)],
-            additional_pts = if !isempty(additional_pts)
+            additional_pts = if !isempty(additional_pts) && !isempty(additional_pts.µ) && !isempty(additional_pts.peaks)
                 # strip the units from the additional points
                 μ_strip = Unitful.unit(first(additional_pts.μ)) != Unitful.NoUnits ? Unitful.ustrip.(report.e_unit, additional_pts.μ) : additional_pts.μ
                 p_strip = Unitful.unit(first(additional_pts.peaks)) != Unitful.NoUnits ? Unitful.ustrip.(report.e_unit, additional_pts.peaks) : additional_pts.peaks    
@@ -200,7 +200,7 @@ module LegendMakieLegendSpecFitsExt
 
         fig = LegendMakie.lplot!(
             report[(:par, :f_fit, :x, :y, :gof)],
-            additional_pts = if !isempty(additional_pts)
+            additional_pts = if !isempty(additional_pts) && !isempty(additional_pts.peaks) && !isempty(additional_pts.fwhm)
                 fwhm_cal = report.f_fit.(Unitful.ustrip.(additional_pts.peaks))
                 (x = Unitful.ustrip.(report.e_unit, additional_pts.peaks), y = Unitful.ustrip.(report.e_unit, additional_pts.fwhm),
                     residuals_norm = (Measurements.value.(fwhm_cal .- Unitful.ustrip.(report.e_unit, additional_pts.fwhm))) ./ Measurements.uncertainty.(fwhm_cal))
@@ -1008,7 +1008,7 @@ module LegendMakieLegendSpecFitsExt
 
     # Dict of reports (vertical alignment)
     function LegendMakie.lplot!(
-            reports::Dict{<:Any, NamedTuple}; title::AbstractString = "", 
+            reports::AbstractDict{<:Any, NamedTuple}; title::AbstractString = "", 
             watermark::Bool = true, final::Bool = true, kwargs...
         )
 

@@ -123,12 +123,16 @@ end
             result_calib, report_calib = LegendSpecFits.fit_calibration(1, μ_fit, energies)
             @testset "Fit energy calibration" begin
                 @test_nowarn lplot(report_calib, xerrscaling=10, yerrscaling=10, additional_pts=(μ = [100_000], peaks = [1000u"keV"]), title = "Test")
+                @test_nowarn lplot(report_calib, xerrscaling=10, yerrscaling=10, additional_pts=(μ = [], peaks = []), title = "Test")
+                @test_nowarn lplot(report_calib, xerrscaling=10, yerrscaling=10, title = "Test")
             end
             f_cal_widths(x) = report_calib.f_fit(x) .* report_calib.e_unit .- first(report_calib.par)
             fwhm_fit = f_cal_widths.(getfield.(getindex.(Ref(result_fit), lines), :fwhm))
             result_fwhm, report_fwhm = LegendSpecFits.fit_fwhm(1, energies, fwhm_fit, uncertainty=true)
             @testset "FWHM energy calibration" begin
                 @test_nowarn lplot(report_fwhm, additional_pts=(peaks = [1000u"keV"], fwhm = [3.5u"keV"]), title = "Test")
+                @test_nowarn lplot(report_fwhm, additional_pts=(peaks = [], fwhm = []), title = "Test")
+                @test_nowarn lplot(report_fwhm, title = "Test")
             end
             @testset "Throw warning for wrong report types" begin
                 report_calib_faulty = NamedTuple{keys(report_calib)}((k == :type) ? (:faulty) : report_calib[k] for k in keys(report_calib))
