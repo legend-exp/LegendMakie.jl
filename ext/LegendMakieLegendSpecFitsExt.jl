@@ -1008,7 +1008,7 @@ module LegendMakieLegendSpecFitsExt
 
     # Dict of reports (vertical alignment)
     function LegendMakie.lplot!(
-            reports::Dict{<:Any, NamedTuple}; title::AbstractString = "", 
+            reports::AbstractDict{<:Any, NamedTuple}; title::AbstractString = "", 
             watermark::Bool = true, final::Bool = true, kwargs...
         )
 
