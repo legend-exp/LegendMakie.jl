@@ -11,7 +11,7 @@ module LegendMakieLegendDataManagementExt
     import TypedTables
     import Unitful
 
-    import LegendMakie: pt, parameterplot!
+    import LegendMakie: parameterplot!
 
 
     Makie.@recipe(ParameterPlot, chinfo, pars, properties) do scene

@@ -5,9 +5,9 @@ function LegendMakie.lhist!(
     watermark::Bool = true, rasterize::Bool = false, 
     position::String = "outer top", final::Bool = true,
     colormap::Symbol = :magma, colorscale = Makie.log10, 
-    title::AbstractString = "", xlabel = "", ylabel = "", 
-    xticks = Makie.automatic, yticks = Makie.automatic,
-    xlims = extrema(first(h.edges)), ylims = extrema(last(h.edges)),
+    title::AbstractString = "", titlesize = 18, titlegap = 2, titlealign = :right,
+    xlabel = "", ylabel = "", xlims = extrema(first(h.edges)), ylims = extrema(last(h.edges)),
+    xticks = Makie.WilkinsonTicks(6,k_min=5), yticks = Makie.WilkinsonTicks(6,k_min=4),
     kwargs...
 )
 
@@ -16,12 +16,8 @@ function LegendMakie.lhist!(
 
     #create plot
     ax = Makie.Axis(g[1,1],
-        title = title,
-        titlesize = 18,
-        titlegap = 2,
-        titlealign = :right,
         limits = (xlims, ylims);
-        xlabel, ylabel, xticks, yticks
+        title, titlegap, titlesize, titlealign, xlabel, ylabel, xticks, yticks
     )
 
     hm = Makie.heatmap!(ax, h.edges..., replace(h.weights, 0 => NaN); colormap, colorscale)
@@ -43,9 +39,11 @@ end
 
 function LegendMakie.lhist!(
         h::StatsBase.Histogram{<:Any, 1}; 
-        title::AbstractString = "", xlabel = "", ylabel = "", label = nothing,
-        xticks = Makie.automatic, yticks = Makie.automatic, yscale = Makie.identity,
-        xlims = extrema(first(h.edges)), ylims = (yscale == Makie.log10 ? 0.9 : 0, maximum(h.weights)*1.2),
+        title::AbstractString = "", titlesize = 18, titlegap = 2,
+        xlabel = "", ylabel = "", label = nothing, yscale = Makie.identity,
+        xlims = extrema(first(h.edges)), xticks = Makie.WilkinsonTicks(6,k_min=5), 
+        yticks = yscale == Makie.log10 ? Makie.LogTicks(Makie.WilkinsonTicks(5, k_min = 3)) : Makie.WilkinsonTicks(6, k_min=4), 
+        ylims = (yscale == Makie.log10 ? 0.9 : 0, maximum(h.weights)*1.2),
         fill::Bool = false, color = LegendMakie.AchatBlue, linewidth = 2, legend_position = :rt,
         watermark::Bool = true, final::Bool = !isempty(title), kwargs...
     )
@@ -55,11 +53,8 @@ function LegendMakie.lhist!(
     #create plot
     ax = if isnothing(Makie.current_axis())
         Makie.Axis(fig[1,1],
-            title = title,
-            titlesize = 18,
-            titlegap = 2,
             limits = (xlims, ylims);
-            xlabel, ylabel, xticks, yticks, yscale
+            title, titlesize, titlegap, xlabel, ylabel, xticks, yticks, yscale
         )
     else
         Makie.current_axis()
