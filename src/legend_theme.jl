@@ -14,17 +14,17 @@ const LegendTheme = Theme(
         xticklabelfont = :regular, 
         yticklabelfont = :regular,
         titlegap = 1,
-        titlesize = 15pt,
-        xlabelsize = 15pt,
-        ylabelsize = 15pt,
-        xticklabelsize = 12pt,
-        yticklabelsize = 12pt,
+        titlesize = 18,
+        xlabelsize = 18,
+        ylabelsize = 18,
+        xticklabelsize = 16,
+        yticklabelsize = 16,
         xgridvisible = false,
         ygridvisible = false
     ),
     Scatter = (
         color = :black, # seems to be ignored, defaulting to palette colors
-        markersize = 10,
+        markersize = 8,
         strokewidth = 0,
     ),
     Errorbars = (
@@ -41,7 +41,7 @@ const LegendTheme = Theme(
     ),
     Legend = (
         framevisible = false, 
-        labelsize = 12pt,
+        labelsize = 16,
         patchsize = (20, 10), 
         patchlabelgap = 10, 
         rowgap = 10, 
@@ -58,7 +58,7 @@ const LegendTheme = Theme(
         patchcolor = [(ICPCBlue,0.6), (PPCPurple,0.6), (BEGeOrange,0.6), (CoaxGreen,0.6)],
     ),
     font = :regular,
-    fontsize = 12pt,
+    fontsize = 16,
     figure_padding = 21,
     size = (600,400)
 )
