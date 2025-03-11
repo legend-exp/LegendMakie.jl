@@ -5,6 +5,7 @@
 # for local builds.
 
 using Documenter
+using Literate
 using LegendMakie
 
 # Doctest setup
@@ -15,15 +16,31 @@ DocMeta.setdocmeta!(
     recursive=true,
 )
 
+function fix_literate_output(content)
+    content = replace(content, "EditURL = \"@__REPO_ROOT_URL__/\"" => "")
+    return content
+end
+
+gen_content_dir = joinpath(@__DIR__, "src", "tutorials")
+for tut_lit_fn in filter(fn -> endswith(fn, "_lit.jl"), readdir(gen_content_dir))
+    lit_src_fn = joinpath(gen_content_dir, tut_lit_fn)
+    tut_basename = tut_lit_fn[1:end-7] # remove "_lit.jl"
+    Literate.markdown(lit_src_fn, gen_content_dir, name = tut_basename, documenter = true, credit = true, postprocess = fix_literate_output)
+end
+
 makedocs(
     sitename = "LegendMakie",
     modules = [LegendMakie],
     format = Documenter.HTML(
         prettyurls = !("local" in ARGS),
-        canonical = "https://legend-exp.github.io/LegendMakie.jl/stable/"
+        canonical = "https://legend-exp.github.io/LegendMakie.jl/stable/",
+        size_threshold = nothing, size_threshold_warn = nothing, example_size_threshold = nothing
     ),
     pages = [
         "Home" => "index.md",
+        "Tutorials" => [
+            "tutorials/basic_tutorial.md",
+        ],
         "API" => "api.md",
         "LICENSE" => "LICENSE.md",
     ],
