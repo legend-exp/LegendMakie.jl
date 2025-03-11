@@ -10,8 +10,6 @@ module LegendMakieMakieExt
     import Makie
     import MathTeXEngine
     import StatsBase
-    
-    import LegendMakie: pt
 
     include("recipes/recipes.jl")
     include("recipes/lplot.jl")

@@ -17,7 +17,7 @@ function LegendMakie.add_logo!(; fontsize = 18, position = "outer right", textco
     refsize = 13.5
         
     # modify size using fontsize
-    font_scale = fontsize/refsize * 0.024pt
+    font_scale = fontsize/refsize * 0.032
         
     figwidth, figheight = fig.scene.viewport[].widths
     axleft, axbot = ax.scene.viewport[].origin
