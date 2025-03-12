@@ -376,7 +376,7 @@ module LegendMakieLegendSpecFitsExt
             title::AbstractString = "", xunit = Unitful.unit(first(report.x)), yunit = Unitful.unit(first(report.y)),
             xlabel = "", ylabel = "", xlegendlabel = xlabel, ylegendlabel = ylabel, obj = "Min.", xticks = Makie.WilkinsonTicks(6, k_min = 5),  
             xlims = Unitful.ustrip.(xunit, extrema(report.x) .+ (-1, 1) .* (report.x[2] - report.x[1])),
-            ylims = max.(0, Unitful.ustrip.(yunit, extrema(Measurements.value.(report.y)) .+ (-1, 1) .* (-)(extrema(Measurements.value.(report.y))...) .* 0.1)),
+            ylims = max.(0, Unitful.ustrip.(yunit, extrema(Measurements.value.(report.y)) .- (-1, 1) .* (-)(extrema(Measurements.value.(report.y))...) .* 0.1)),
             legend_position = :rt, watermark::Bool = true, final::Bool = !isempty(title), kwargs...
         )
 
