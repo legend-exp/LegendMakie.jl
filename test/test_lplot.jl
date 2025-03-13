@@ -202,7 +202,10 @@ end
             e_cal = 1.5u"keV" .* randn(100_000) .+ 2614.5u"keV"
             result_peaks_ds, report_peaks_ds = LegendSpecFits.get_peaks_survival_fractions(
                 aoe, e_cal, [2614.5u"keV"], [:Tl208FEP], [(35.0u"keV",35.0u"keV")], -5.0)
-            @test_nowarn LegendMakie.lplot(report_peaks_ds[:Tl208FEP], title = "Test")
+            @test_nowarn LegendMakie.lplot(report_peaks_ds[:Tl208FEP], sf_in_title = true, title = "Test")
+            @test_nowarn LegendMakie.lplot(report_peaks_ds[:Tl208FEP], sf_in_title = false, title = "Test")
+            @test_nowarn LegendMakie.lplot(report_peaks_ds, title = "Test")
+            @test_nowarn LegendMakie.lplot(report_peaks_ds, sf_in_title = false, title = "Test")
         end
 
         @testset "LQ plots" begin
