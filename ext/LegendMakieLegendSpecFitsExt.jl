@@ -252,8 +252,7 @@ module LegendMakieLegendSpecFitsExt
             ylims = (ylim_min, ylim_max)
         end
 
-        ax = Makie.Axis(g[1,1], yticks = (exp10.(0:10), "1" .* join.(fill.("0", 0:10))), 
-            ylabel = "Counts / $(round(step(first(report.survived.h.edges)), digits=2)) keV", 
+        ax = Makie.Axis(g[1,1], ylabel = "Counts / $(round(step(first(report.survived.h.edges)), digits=2)) keV", 
             limits = (xlims, ylims); yscale, xlabel, title = sf_in_title ? "$title Survival fraction: $(round(report.sf * 100, digits = 2))%" : title, xticks)
         
         before_data = Makie.plot!(ax, report.survived.h, color = (:gray, 0.5), fillto = 0.5)
