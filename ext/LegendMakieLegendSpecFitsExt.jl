@@ -809,7 +809,7 @@ module LegendMakieLegendSpecFitsExt
 
     # plot report from ctc_aoe
     function LegendMakie.lplot!( 
-            report::NamedTuple{(:peak, :window, :fct, :bin_width, :bin_width_qdrift, :aoe_peak, :aoe_ctc, :qdrift_peak, :h_before, :h_after, :σ_before, :σ_after, :report_before, :report_after)};
+            report::NamedTuple{(:peak, :window, :fct, :bin_width, :bin_width_qdrift, :aoe_peak, :aoe_ctc, :aoe_ctc_norm, :qdrift_peak, :h_before, :h_after, :h_after_norm, :σ_before, :σ_after, :σ_after_norm, :report_before, :report_after, :report_after_norm)};
             label_before = "Before correction", label_after = "After correction", levels = 15,
             xlims = (-9,5), ylims = StatsBase.quantile.(Ref(report.qdrift_peak), (0.005, 0.995)), xticks = Makie.WilkinsonTicks(6,k_min=5), yticks = Makie.WilkinsonTicks(6,k_min=4),
             title::AbstractString = "", titlesize = 18, titlegap = 0,
