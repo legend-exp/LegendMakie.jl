@@ -310,7 +310,7 @@ module LegendMakieLegendSpecFitsExt
         )
 
         Makie.hist!(ax, StatsBase.midpoints(first(report.h_cal.edges)), weights = report.h_cal.weights, bins = first(report.h_cal.edges), color = LegendMakie.DiamondGrey, label = "Amplitudes", fillto = 1e-2)
-        Makie.lines!(range(xlims..., length = 1000), x -> report.f_fit(x), linewidth = 2, color = :black, label = ifelse(show_label, "Best Fit" * (!isempty(report.gof) ? " (p = $(round(report.gof.pvalue, digits=2)))" : ""), nothing))
+        Makie.lines!(range(extrema(first(report.h_cal.edges))..., length = 1000), x -> report.f_fit(x), linewidth = 2, color = :black, label = ifelse(show_label, "Best Fit" * (!isempty(report.gof) ? " (p = $(round(report.gof.pvalue, digits=2)))" : ""), nothing))
 
         # show individual components of the Gaussian mixtures
         if show_components
@@ -511,7 +511,7 @@ module LegendMakieLegendSpecFitsExt
         )
 
         data = Makie.hist!(ax, StatsBase.midpoints(first(report.h.edges)), weights = report.h.weights, bins = first(report.h.edges), color = LegendMakie.DiamondGrey)
-        fit = Makie.lines!(range(xlims..., length = 1000), x -> report.f_fit(x) * step(first(report.h.edges)), color = :black)
+        fit = Makie.lines!(range(extrema(first(report.h.edges))..., length = 1000), x -> report.f_fit(x) * step(first(report.h.edges)), color = :black)
         
         if legend_position != :none 
             Makie.axislegend(ax, show_label ? [data, fit] : [data],
