@@ -809,12 +809,12 @@ module LegendMakieLegendSpecFitsExt
 
     # plot report from ctc_aoe
     function LegendMakie.lplot!( 
-            report::NamedTuple{(:peak, :window, :fct, :bin_width, :bin_width_qdrift, :aoe_peak, :aoe_ctc, :qdrift_peak, :h_before, :h_after, :σ_before, :σ_after, :report_before, :report_after)};
+            report::NamedTuple{(:peak, :window, :fct, :bin_width, :bin_width_qdrift, :aoe_peak, :aoe_ctc, :aoe_ctc_norm, :qdrift_peak, :h_before, :h_after, :h_after_norm, :σ_before, :σ_after, :σ_after_norm, :report_before, :report_after, :report_after_norm)};
             label_before = "Before correction", label_after = "After correction", levels = 15,
             xlims = (-9,5), ylims = StatsBase.quantile.(Ref(report.qdrift_peak), (0.005, 0.995)), xticks = Makie.WilkinsonTicks(6,k_min=5), yticks = Makie.WilkinsonTicks(6,k_min=4),
-            title::AbstractString = "", titlesize = 18, titlegap = 0,
+            title::AbstractString = "", titlesize = 18, titlegap = 0, norm::Bool = false,
             xlabel = "A/E classifier", ylabel = "Qdrift / E",
-             watermark::Bool = true, kwargs...
+            watermark::Bool = true, kwargs...
         )
 
         # Best results for figsize (600,600)
@@ -824,7 +824,7 @@ module LegendMakieLegendSpecFitsExt
         
         ax = Makie.Axis(g[1,1], limits = (xlims,(0,nothing)), ylabel = "Counts / $(round(step(first(report.h_before.edges)), digits = 2))")
         h_before = Makie.plot!(ax, report.h_before, color = :darkgrey)
-        h_after  = Makie.plot!(ax, report.h_after, color = (:purple, 0.5))
+        h_after  = Makie.plot!(ax, norm ? report.h_after_norm : report.h_after, color = (:purple, 0.5))
         
         ax3 = Makie.Axis(g[1,2])
         Makie.hidedecorations!(ax3)
@@ -833,7 +833,7 @@ module LegendMakieLegendSpecFitsExt
         
         ax2 = Makie.Axis(g[2,1]; limits = (xlims, ylims), xticks, yticks, xlabel, ylabel)
         k_before = KernelDensity.kde((report.aoe_peak, report.qdrift_peak))
-        k_after = KernelDensity.kde((report.aoe_ctc, report.qdrift_peak))
+        k_after = KernelDensity.kde((norm ? report.aoe_ctc_norm : report.aoe_ctc, report.qdrift_peak))
         Makie.contourf!(ax2, k_before.x, k_before.y, k_before.density, levels = levels, colormap = :binary)
         Makie.contour!(ax2, k_before.x, k_before.y, k_before.density, levels = levels - 1, color = :white)
         Makie.contour!(ax2, k_after.x, k_after.y, k_after.density, levels = levels - 1, colormap = :plasma)
