@@ -188,12 +188,17 @@ end
         @testset "A/E ctc correlation plot" begin
             # generate fake A/E and Qdrift/E distribution 
             E0 = 550u"keV"
-            e_cal = fill(E0, 10_000)
-            aoe_corr = clamp.(vcat(-rand(Distributions.Exponential(5.0), 2_000), zeros(8_000)) .+ randn(10_000), -49.0, 7.0)
-            qdrift_e = max.(0, randn(10_000) .+ 5)
-            @test length(e_cal) == length(aoe_corr) == length(qdrift_e) == 10_000
+            e_cal = fill(E0, 100_000)
+            aoe_corr = clamp.(vcat(-rand(Distributions.Exponential(5.0), 20_000), zeros(80_000)) .+ randn(100_000), -49.0, 7.0)
+            qdrift_e = max.(0, randn(100_000) .+ 5)
+            # add some fake drift time dependency
+            fct = 0.1
+            aoe_corr .-= qdrift_e .* fct
+            aoe_corr .-= StatsBase.median(aoe_corr)
+            @test length(e_cal) == length(aoe_corr) == length(qdrift_e) == 100_000
             result_aoe_ctc, report_aoe_ctc = LegendSpecFits.ctc_aoe(aoe_corr, e_cal, qdrift_e, [E0-10u"keV"])
             @test_nowarn lplot(report_aoe_ctc, figsize = (600,600), title = "Test")
+            @test_nowarn lplot(report_aoe_ctc, norm = true, figsize = (600,600), title = "Test")
         end
 
         @testset "A/E survival fraction plots" begin
