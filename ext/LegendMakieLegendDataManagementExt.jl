@@ -18,6 +18,7 @@ module LegendMakieLegendDataManagementExt
         Makie.Attributes(
             xlabel = "Detector",
             ylabel = missing,
+	    label = nothing,
             color = LegendMakie.AchatBlue,
             legend_logo = true,
             juleana_logo = true,
@@ -81,7 +82,7 @@ module LegendMakieLegendDataManagementExt
         ylabel = ismissing(p.ylabel[]) ? (length(properties) > 0 ? join(string.(properties), " ") : "Quantity") * ifelse(u == Unitful.NoUnits, "", " ($u)") : p.ylabel[]
 
         Makie.errorbars!(p, xvalues, Unitful.ustrip.(u, Measurements.value.(yvalues)), Unitful.ustrip.(u, Measurements.uncertainty.(yvalues)), color = p.color)
-        Makie.scatter!(p, xvalues, Unitful.ustrip.(u, Measurements.value.(yvalues)), color = p.color)
+        Makie.scatter!(p, xvalues, Unitful.ustrip.(u, Measurements.value.(yvalues)), color = p.color, label = p.label)
         Makie.vlines!(p, vlines .- 1, color = :black)
 
         ax = Makie.current_axis()
