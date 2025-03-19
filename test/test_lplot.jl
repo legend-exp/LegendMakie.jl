@@ -5,14 +5,18 @@ using Makie, CairoMakie
 
 import LegendSpecFits
 import LegendDataManagement
+import LegendHDF5IO
 import LegendTestData
 testdata_dir = joinpath(LegendTestData.legend_test_data_path(), "data", "legend")
 ENV["LEGEND_DATA_CONFIG"] = joinpath(testdata_dir, "config.json")
 
+import Dates
 import Distributions
 import Measurements
 import PropDicts
+import RadiationDetectorSignals
 import StatsBase
+import TypedTables
 import Unitful: @u_str
 
 using Test
@@ -252,5 +256,61 @@ end
             delete!(pd, :V99000A)
             @test_logs (:warn,) LegendMakie.lplot(chinfo, pd)
         end
+    end
+
+    @testset "Test event plot" begin
+        
+        # create lh5 test directory
+        testdir = joinpath(dirname(dirname(pathof(LegendMakie))), "test","lh5")
+        isdir(testdir) && rm(testdir, force = true, recursive = true)
+        mkdir(testdir)
+        @test isdir(testdir)
+
+        # link it in the legend data config
+        pd = PropDicts.readprops(LegendTestData.activate_legend_test_data_config())
+        pd.setups.l200.paths[Symbol("tier/raw")] = testdir
+        # pd.setups.l200.paths[Symbol("tier/raw")] 
+        PropDicts.writeprops(joinpath(testdir, "test_config.json"), pd)
+        ENV["LEGEND_DATA_CONFIG"] = joinpath(testdir, "test_config.json");
+        data = LegendDataManagement.LegendData(:l200)
+        
+        # create fake data
+        for fk in [LegendDataManagement.runinfo(data).phy.startkey; LegendDataManagement.runinfo(data).cal.startkey]
+            _, period, run, cat, time = split(string(fk), "-")
+            !isdir(joinpath(testdir, cat)) && mkdir(joinpath(testdir, cat))
+            !isdir(joinpath(testdir, cat, period)) && mkdir(joinpath(testdir, cat, period))
+            !isdir(joinpath(testdir, cat, period, run)) && mkdir(joinpath(testdir, cat, period, run))
+            #create fake files
+            chinfo = LegendDataManagement.channelinfo(data, fk, system = :geds)
+            LegendHDF5IO.lh5open(joinpath(testdir, cat, period, run, "$(fk)-tier_raw.lh5"), "w") do h
+                for ch in chinfo.channel
+                    h["$(ch)/raw"] = TypedTables.Table(
+                        timestamp = [Dates.datetime2unix(Dates.DateTime(fk))u"s" + 100u"s"],
+                        waveform_presummed = [RadiationDetectorSignals.RDWaveform(range(0u"μs", 128u"μs", length = 1000), rand(UInt8, 1000))],
+                        waveform_windowed = [RadiationDetectorSignals.RDWaveform(range(0u"μs", 128u"μs", length = 1000), rand(UInt8, 1000))],
+                    )
+                end
+            end
+        end
+
+        # plot the event
+        ch = LegendDataManagement.ChannelId(11)
+        t_cal = 1.6786153e9u"s"
+        t_phy = 1.6787017e9u"s"
+
+        @testset "Event plots" begin 
+            @test_nowarn lplot(data, t_cal, figsize = (800,600), xlims = (0,128))
+            @test_nowarn lplot(data, t_phy, figsize = (800,600), xlims = (0,128))
+            @test_nowarn lplot(data, Dates.DateTime(Dates.unix2datetime(t_cal ./ u"s")))
+        end
+
+        @testset "Channel plots" begin 
+            @test_nowarn lplot(data, t_cal, ch, figsize = (800,380), xlims = (0,128))
+            @test_throws ArgumentError lplot(data, t_cal .+ 1u"s", ch, figsize = (800,380), xlims = (0,128))
+            @test_nowarn lplot(data, t_phy, ch, figsize = (800,380), xlims = (0,128), show_label = false)
+        end
+        
+        # remove test repository
+        isdir(testdir) && rm(testdir, force = true, recursive = true)
     end
 end
