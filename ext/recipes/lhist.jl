@@ -4,10 +4,12 @@ function LegendMakie.lhist!(
     h::StatsBase.Histogram{<:Any, 2};
     watermark::Bool = true, rasterize::Bool = false, 
     position::String = "outer top", final::Bool = true,
-    colormap::Symbol = :magma, colorscale = Makie.log10, 
+    colormap::Symbol = :magma, colorscale = Makie.log10, colorbarlabel = "",
     title::AbstractString = "", titlesize = 18, titlegap = 2, titlealign = :right,
     xlabel = "", ylabel = "", xlims = extrema(first(h.edges)), ylims = extrema(last(h.edges)),
-    xticks = Makie.WilkinsonTicks(6,k_min=5), yticks = Makie.WilkinsonTicks(6,k_min=4),
+    xscale = Makie.identity, yscale = Makie.identity,
+    xticks = xscale == Makie.log10 ? Makie.LogTicks(Makie.WilkinsonTicks(5, k_min = 3)) : Makie.WilkinsonTicks(6, k_min=5), 
+    yticks = yscale == Makie.log10 ? Makie.LogTicks(Makie.WilkinsonTicks(5, k_min = 3)) : Makie.WilkinsonTicks(6, k_min=4), 
     kwargs...
 )
 
@@ -17,7 +19,7 @@ function LegendMakie.lhist!(
     #create plot
     ax = Makie.Axis(g[1,1],
         limits = (xlims, ylims);
-        title, titlegap, titlesize, titlealign, xlabel, ylabel, xticks, yticks
+        title, titlegap, titlesize, titlealign, xlabel, ylabel, xticks, yticks, xscale, yscale
     )
 
     hm = Makie.heatmap!(ax, h.edges..., replace(h.weights, 0 => NaN); colormap, colorscale)
@@ -25,7 +27,8 @@ function LegendMakie.lhist!(
     cb = if colorscale == Makie.log10
         Makie.Colorbar(g[1,2], hm, 
             tickformat = values -> Makie.rich.("10", Makie.superscript.(string.(Int.(log10.(values))))),
-            ticks = exp10.(0:ceil(maximum(log10.(h.weights)))))
+            ticks = exp10.(0:ceil(maximum(log10.(h.weights)))),
+            label = colorbarlabel)
     else
         Makie.Colorbar(g[1,2], hm, minorticksvisible = false)
     end
