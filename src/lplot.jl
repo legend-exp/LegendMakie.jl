@@ -40,6 +40,7 @@ function residualplot! end
 function energycalibrationplot! end
 function aoecorrectionplot! end
 function parameterplot! end
+function waveformplot! end
 
 # watermark functions
 function add_logo! end
