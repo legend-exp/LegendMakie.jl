@@ -59,6 +59,7 @@ module LegendMakieLegendSpecFitsExt
         Makie.Attributes(
             color = LegendMakie.AchatBlue,
             plot_ribbon = true,
+            plot_gof = true,
             xerrscaling = 1,
             yerrscaling = 1
         )
@@ -80,7 +81,7 @@ module LegendMakieLegendSpecFitsExt
         xfit = 0:1:1.2*Measurements.value(maximum(report.x))
         yfit = report.f_fit.(xfit)
         yfit_m = Measurements.value.(yfit)
-        Makie.lines!(xfit, yfit_m, label = "Best Fit" * (!isempty(report.gof) ? " (p = $(round(report.gof.pvalue, digits=2))| χ²/ndf = $(round(report.gof.chi2min, digits=2)) / $(report.gof.dof))" : ""), color = p.color)
+        Makie.lines!(xfit, yfit_m, label = "Best Fit" * ((!isempty(report.gof) && p.plot_gof[]) ? " (p = $(round(report.gof.pvalue, digits=2))| χ²/ndf = $(round(report.gof.chi2min, digits=2)) / $(report.gof.dof))" : ""), color = p.color)
         if p.plot_ribbon[]
             Δyfit = Measurements.uncertainty.(yfit)
             Makie.band!(xfit, yfit_m .- Δyfit, yfit_m .+ Δyfit, color = (p.color[], 0.2))
@@ -105,7 +106,7 @@ module LegendMakieLegendSpecFitsExt
             xticks = Makie.WilkinsonTicks(6, k_min = 5), xtickformat = Makie.automatic,
             xlims = (0, 1.2*Measurements.value(maximum(report.x))), ylims = nothing,
             xlabel = "Energy (ADC)", ylabel = "Energy (calibrated)", 
-            show_residuals::Bool = true, plot_ribbon::Bool = true, legend_position = :lt,
+            show_residuals::Bool = true, plot_ribbon::Bool = true, plot_gof::Bool = true, legend_position = :lt,
             xerrscaling::Real = 1, yerrscaling::Real = 1, row::Int = 1, col::Int = 1,
             watermark::Bool = true, final::Bool = !isempty(title), kwargs...
         )
@@ -118,7 +119,7 @@ module LegendMakieLegendSpecFitsExt
             title, titlesize, xlabel, ylabel, xticks, xtickformat
         )
         
-        LegendMakie.energycalibrationplot!(ax, report; plot_ribbon, xerrscaling, yerrscaling)
+        LegendMakie.energycalibrationplot!(ax, report; plot_ribbon, xerrscaling, yerrscaling, plot_gof)
         legend_position != :none && Makie.axislegend(ax, position = legend_position)
     
         # plot additional points
