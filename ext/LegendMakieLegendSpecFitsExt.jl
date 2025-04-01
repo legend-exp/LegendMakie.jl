@@ -81,7 +81,7 @@ module LegendMakieLegendSpecFitsExt
         xfit = 0:1:1.2*Measurements.value(maximum(report.x))
         yfit = report.f_fit.(xfit)
         yfit_m = Measurements.value.(yfit)
-        Makie.lines!(xfit, yfit_m, label = "Best Fit" * ((!isempty(report.gof) && p.plot_gof[]) ? " (p = $(round(report.gof.pvalue, digits=2))| χ²/ndf = $(round(report.gof.chi2min, digits=2)) / $(report.gof.dof))" : ""), color = p.color)
+        Makie.lines!(xfit, yfit_m, label = "Best Fit" * ((!isempty(report.gof) && p.plot_gof[] && isfinite(report.gof.pvalue)) ? " (p = $(round(report.gof.pvalue, digits=2))| χ²/ndf = $(round(report.gof.chi2min, digits=2)) / $(report.gof.dof))" : ""), color = p.color)
         if p.plot_ribbon[]
             Δyfit = Measurements.uncertainty.(yfit)
             Makie.band!(xfit, yfit_m .- Δyfit, yfit_m .+ Δyfit, color = (p.color[], 0.2))
