@@ -591,7 +591,7 @@ module LegendMakieLegendSpecFitsExt
     # plot report from simple_calibration
     function LegendMakie.lplot!(
             report::NamedTuple{(:h_calsimple, :h_uncal, :c, :peak_guess, :peakhists, :peakstats)};
-            cal::Bool = true, 
+            cal::Bool = true, h = StatsBase.normalize(cal ? report.h_calsimple : report.h_uncal, mode = :density),
             title::AbstractString = "", titlegap = 2, titlesize = 18, label = "Energy",
             xlims = (0, cal ? 3000 : 1.2*report.peak_guess), xlabel = "Energy ($(cal ? "keV" : "ADC"))", 
             xticks = cal ? (0:300:3000) : (0:50000:1.2*report.peak_guess),
@@ -604,7 +604,6 @@ module LegendMakieLegendSpecFitsExt
         fig = Makie.current_figure()
         
         # select correct histogram
-        h = StatsBase.normalize(cal ? report.h_calsimple : report.h_uncal, mode = :density)
         peak_guess = cal ? Unitful.ustrip(report.c * report.peak_guess) : report.peak_guess
 
         # create main histogram plot
