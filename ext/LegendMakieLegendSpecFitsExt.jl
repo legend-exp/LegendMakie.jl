@@ -590,29 +590,33 @@ module LegendMakieLegendSpecFitsExt
 
     # plot report from simple_calibration
     function LegendMakie.lplot!(
-            report::NamedTuple{(:h_calsimple, :h_uncal, :c, :fep_guess, :peakhists, :peakstats)};
-            cal::Bool = true, h = StatsBase.normalize(cal ? report.h_calsimple : report.h_uncal, mode = :density),
+            report::NamedTuple{(:h_calsimple, :h_uncal, :c, :peak_guess, :peakhists, :peakstats)};
+            cal::Bool = true, 
             title::AbstractString = "", titlegap = 2, titlesize = 18, label = "Energy",
-            xlims = (0, cal ? 3000 : 1.2*report.fep_guess), xlabel = "Energy ($(cal ? "keV" : "ADC"))", 
-            xticks = cal ? (0:300:3000) : (0:50000:1.2*report.fep_guess), 
+            xlims = (0, cal ? 3000 : 1.2*report.peak_guess), xlabel = "Energy ($(cal ? "keV" : "ADC"))", 
+            xticks = cal ? (0:300:3000) : (0:50000:1.2*report.peak_guess),
             ylims = extrema(filter(x -> x > 0, h.weights)) .* (0.99, 1.2 * 1.1), 
-            ylabel = "Counts / $(round(step(first(h.edges)), digits = 2)) $(cal ? "keV" : "ADC")", yscale = Makie.log10,
+            ylabel = "Counts / $(round(step(first(h.edges)), digits = 2)) $(cal ? "keV" : "ADC")", 
+            yscale = Makie.log10,
             watermark::Bool = true, final::Bool = !isempty(title), kwargs...
         )
         
         fig = Makie.current_figure()
         
         # select correct histogram
-        fep_guess = cal ? 2614.5 : report.fep_guess
+        h = StatsBase.normalize(cal ? report.h_calsimple : report.h_uncal, mode = :density)
+        peak_guess = cal ? Unitful.ustrip(report.c * report.peak_guess) : report.peak_guess
 
         # create main histogram plot
-        ax = Makie.Axis(fig[1,1], 
-            limits = (xlims, ylims);
-            title, titlesize, titlegap, xticks, xlabel, ylabel, yscale
+        ax = Makie.Axis(
+            fig[1,1];
+            title, titlegap = titlegap, titlesize = titlesize,
+            limits = (xlims, ylims),
+            xticks, xlabel, ylabel, yscale
         )
         
-        Makie.stephist!(ax, StatsBase.midpoints(first(h.edges)), bins = first(h.edges), weights = h.weights; label)
-        Makie.vlines!(ax, [fep_guess], color = :red, label = "FEP Guess", linewidth = 1.5)
+        Makie.stephist!(ax, StatsBase.midpoints(first(h.edges)), bins = first(h.edges), weights = h.weights, label = "Energy")
+        Makie.vlines!(ax, [peak_guess], color = :red, label = "FEP Guess", linewidth = 1.5)
         Makie.axislegend(ax, position = :ct)
         
         # add watermarks
