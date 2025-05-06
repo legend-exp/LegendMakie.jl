@@ -48,3 +48,4 @@ function add_legend_logo! end
 function add_juleana_logo! end
 function add_text! end
 function add_watermarks! end
+function add_production! end
