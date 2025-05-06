@@ -61,10 +61,17 @@ function LegendMakie.add_text!(text::AbstractString)
     fig
 end
 
+function LegendMakie.add_production!(prodname::AbstractString; fontsize::Real = 7)
+    fig = Makie.current_figure()
+    ax = Makie.current_axis()
+    axright, axtop = ax.scene.viewport[].origin .+ ax.scene.viewport[].widths .* 0.995
+    Makie.text!(fig.scene, prodname; fontsize, position = (axright, axtop), align = (:right, :top))
+    fig
+end
 
 function LegendMakie.add_watermarks!(;
         legend_logo::Bool = false, juleana_logo::Bool = true, position::String = "outer right",
-        preliminary::Bool = true, approved::Bool = false, final::Bool = false,
+        preliminary::Bool = true, approved::Bool = false, final::Bool = false, production::Bool = true,
         kwargs...
     )
     if legend_logo
@@ -77,6 +84,11 @@ function LegendMakie.add_watermarks!(;
         LegendMakie.add_text!("PRELIMINARY")
     elseif !final && !approved
         LegendMakie.add_text!("INTERNAL USE ONLY")
+    end
+
+    if production && haskey(ENV, "LEGEND_DATA_CONFIG")
+        prodname = basename(dirname(last(split(ENV["LEGEND_DATA_CONFIG"], ":"))))
+        LegendMakie.add_production!(prodname)
     end
 
     Makie.current_figure()
