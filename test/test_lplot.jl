@@ -63,6 +63,23 @@ end
 
             result, report = LegendSpecFits.fit_single_trunc_gauss(randn(10000), uncertainty = false)
             @test_nowarn lplot(report, xlabel = "Test")
+
+            result, report = LegendSpecFits.get_centered_gaussian_window_cut(randn(10000), -10.0, 10.0, 1.0; n_bins = -1)
+            @test_nowarn lplot(report, xlabel = "Test")
+        end
+
+        @testset "QC" begin
+            t = Table(x1 = randn(1000000), x2 = randn(1000000))
+            config = PropDict(
+                :x1 => PropDict(:min => -10.0, :max => 10.0, :sigma => 2.0,
+                    :kwargs => PropDict(:relative_cut => 0.01, :n_bins => -1, :fixed_center => false, :left => false)
+                ),
+                :x2 => PropDict(:min => -10.0, :max => 10.0, :sigma => 2.0,
+                    :kwargs => PropDict(:relative_cut => 0.01, :n_bins => -1, :fixed_center => false, :left => true)
+                ))
+            
+            result, report = qc_window_cut(t, config, (:x1, :x2))
+            @test_nowarn lplot(report, title = "Test")
         end
 
         @testset "Filter optimization" begin
