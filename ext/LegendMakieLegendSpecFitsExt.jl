@@ -20,8 +20,23 @@ module LegendMakieLegendSpecFitsExt
         colors[(i - 1) % end + 1]
     end
 
-    function round_wo_units(x::Unitful.RealOrRealQuantity; digits::Int=2)
-        Unitful.unit(x) == Unitful.NoUnits ? round(x; sigdigits=digits) : round(Unitful.unit(x), x; sigdigits=digits)
+    function round_wo_units end
+    round_wo_units(x::Real; digits=2) = round(x, digits=digits)
+    round_wo_units(x::Unitful.Quantity; kwargs...) = round_wo_units(Unitful.ustrip(x); kwargs...)*Unitful.unit(x)
+    function round_wo_units(m::Measurements.Measurement; digits::Int=2)
+        # copied from the truncated_print function in Measurements.jl
+        val = if iszero(m.err) || !isfinite(m.err)
+            m.val
+        else
+            err_digits = -Base.hidigit(m.err, 10) + digits
+            val_digits = if isfinite(m.val)
+                max(-Base.hidigit(m.val, 10) + 2, err_digits)
+            else
+                err_digits
+            end
+            round(m.val, digits = val_digits)
+        end
+        Measurements.measurement(val, round(m.err, sigdigits=digits))
     end
 
     # function to compose labels when errorbars are scaled
