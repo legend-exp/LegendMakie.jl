@@ -69,16 +69,16 @@ end
         end
 
         @testset "QC" begin
-            t = Table(x1 = randn(1000000), x2 = randn(1000000))
-            config = PropDict(
-                :x1 => PropDict(:min => -10.0, :max => 10.0, :sigma => 2.0,
-                    :kwargs => PropDict(:relative_cut => 0.01, :n_bins => -1, :fixed_center => false, :left => false)
+            t = TypedTables.Table(x1 = randn(1000000), x2 = randn(1000000))
+            config = PropDicts.PropDict(
+                :x1 => PropDicts.PropDict(:min => -10.0, :max => 10.0, :sigma => 2.0,
+                    :kwargs => PropDicts.PropDict(:relative_cut => 0.01, :n_bins => -1, :fixed_center => false, :left => false)
                 ),
-                :x2 => PropDict(:min => -10.0, :max => 10.0, :sigma => 2.0,
-                    :kwargs => PropDict(:relative_cut => 0.01, :n_bins => -1, :fixed_center => false, :left => true)
+                :x2 => PropDicts.PropDict(:min => -10.0, :max => 10.0, :sigma => 2.0,
+                    :kwargs => PropDicts.PropDict(:relative_cut => 0.01, :n_bins => -1, :fixed_center => false, :left => true)
                 ))
             
-            result, report = qc_window_cut(t, config, (:x1, :x2))
+            result, report = LegendSpecFits.qc_window_cut(t, config, (:x1, :x2))
             @test_nowarn lplot(report, title = "Test")
         end
 
