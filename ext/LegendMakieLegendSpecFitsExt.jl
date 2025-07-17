@@ -20,8 +20,23 @@ module LegendMakieLegendSpecFitsExt
         colors[(i - 1) % end + 1]
     end
 
-    function round_wo_units(x::Unitful.RealOrRealQuantity; digits::Int=2)
-        Unitful.unit(x) == Unitful.NoUnits ? round(x; digits) : round(Unitful.unit(x), x; digits)
+    function round_wo_units end
+    round_wo_units(x::Real; digits=2) = round(x, sigdigits=digits)
+    round_wo_units(x::Unitful.Quantity; kwargs...) = round_wo_units(Unitful.ustrip(x); kwargs...)*Unitful.unit(x)
+    function round_wo_units(m::Measurements.Measurement; digits::Int=2)
+        # copied from the truncated_print function in Measurements.jl
+        val = if iszero(m.err) || !isfinite(m.err)
+            m.val
+        else
+            err_digits = -Base.hidigit(m.err, 10) + digits
+            val_digits = if isfinite(m.val)
+                max(-Base.hidigit(m.val, 10) + 2, err_digits)
+            else
+                err_digits
+            end
+            round(m.val, digits = val_digits)
+        end
+        Measurements.measurement(val, round(m.err, sigdigits=digits))
     end
 
     # function to compose labels when errorbars are scaled
@@ -434,18 +449,20 @@ module LegendMakieLegendSpecFitsExt
     # plot report from singlefits, e.g. fit_single_trunc_gauss
     function LegendMakie.lplot!(
             report::NamedTuple{(:f_fit, :h, :μ, :σ, :gof)};
-            title::AbstractString = "", titlesize = 18, show_residuals::Bool = true,
-            ylims = (0,nothing), xlabel = "", xticks = Makie.WilkinsonTicks(6, k_min=5), digits = 2,
+            title::AbstractString = "", titlesize = 18, 
+            show_residuals::Bool = true, row::Int = 1, col::Int = 1,
+            ylims = (minimum(filter(x -> x > 0, report.h.weights)),nothing), xlabel = "", xticks = Makie.WilkinsonTicks(6, k_min=5), digits = 2,
             xlims = Unitful.ustrip.(Measurements.value.((report.μ - 5*report.σ, report.μ + 5*report.σ))), 
+            yscale = Makie.log10,
             legend_position = :lt, watermark::Bool = true, final::Bool = !isempty(title), kwargs...
         )
 
         fig = Makie.current_figure()
         
-        g = Makie.GridLayout(fig[1,1])
+        g = Makie.GridLayout(fig[row,col])
         ax = Makie.Axis(g[1,1], 
             titlefont = :bold, limits = (xlims, ylims), ylabel = "Normalized Counts";
-            title, xlabel, xticks, titlesize 
+            yscale, title, xlabel, xticks, titlesize 
         )
         
         # Create histogram
@@ -483,6 +500,32 @@ module LegendMakieLegendSpecFitsExt
         Makie.current_axis!(ax)
         watermark && LegendMakie.add_watermarks!(; final, kwargs...)
         
+        fig
+    end
+
+    # plot QC cut window fits
+    function LegendMakie.lplot!(report::NamedTuple{(:f_fit, :h, :μ, :σ, :gof, :low_cut, :high_cut)}; show_residuals::Bool = true, legend_position = :lt, kwargs...)
+        n_σ = round_wo_units(Measurements.value((report.µ - report.low_cut) / report.σ), digits=1)
+        # plot simpel gaussian fit
+        fig = LegendMakie.lplot!(
+            NamedTuple{(:f_fit, :h, :μ, :σ, :gof)}(report); 
+            xlims = Unitful.ustrip.(Measurements.value.((report.μ - 2.5*n_σ*report.σ, report.μ + 1.5*n_σ*report.σ))),
+            legend_position=:none, show_residuals = show_residuals,
+            kwargs...)
+        
+        # get axis and plot the cut window
+        ax = if !isempty(report.gof) && show_residuals
+            fig.content[end-1]
+        else
+            fig.content[end]
+        end
+        Makie.current_axis!(ax)
+
+        Makie.vspan!(ax, Unitful.ustrip.(Measurements.value.((report.low_cut, report.high_cut)))..., color=LegendMakie.CoaxGreen, alpha=0.05, label=nothing)
+        Makie.vlines!(ax, Unitful.ustrip.(Measurements.value.([report.low_cut, report.high_cut])), linewidth=2.5, color=LegendMakie.CoaxGreen, label="$(n_σ)σ cut window")
+        if legend_position != :none 
+            Makie.axislegend(ax, position = legend_position)
+        end
         fig
     end
 
