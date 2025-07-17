@@ -21,7 +21,7 @@ module LegendMakieLegendSpecFitsExt
     end
 
     function round_wo_units end
-    round_wo_units(x::Real; digits=2) = round(x, digits=digits)
+    round_wo_units(x::Real; digits=2) = round(x, sigdigits=digits)
     round_wo_units(x::Unitful.Quantity; kwargs...) = round_wo_units(Unitful.ustrip(x); kwargs...)*Unitful.unit(x)
     function round_wo_units(m::Measurements.Measurement; digits::Int=2)
         # copied from the truncated_print function in Measurements.jl
