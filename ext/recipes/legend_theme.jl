@@ -1,13 +1,8 @@
 # This file is a part of LegendMakie.jl, licensed under the MIT License (MIT).
 
+import LegendMakie: LegendFont, ICPCBlue, PPCPurple, BEGeOrange, CoaxGreen
 
-"""
-    const LegendTheme
-
-Makie Theme based on the LEGEND-specific style guide.
-
-"""
-const LegendTheme = Theme(
+const LegendTheme = Makie.Theme(
     Axis = (
         xlabelfont = :regular,
         ylabelfont = :regular,
