@@ -26,7 +26,7 @@ module LegendMakieLegendSpecFitsExt
     function round_wo_units(m::Measurements.Measurement; digits::Int=2)
         # copied from the truncated_print function in Measurements.jl
         val = if iszero(m.err) || !isfinite(m.err)
-            m.val
+            round(m.val, sigdigits = digits)
         else
             err_digits = -Base.hidigit(m.err, 10) + digits
             val_digits = if isfinite(m.val)
@@ -406,7 +406,7 @@ module LegendMakieLegendSpecFitsExt
         Makie.errorbars!(ax, Unitful.ustrip.(xunit, report.x), Unitful.ustrip.(yunit, Measurements.value.(report.y)), Unitful.ustrip.(yunit, Measurements.uncertainty.(report.y)))
         Makie.scatter!(ax, Unitful.ustrip.(xunit, report.x), Unitful.ustrip.(yunit, Measurements.value.(report.y)), label = ylegendlabel)
         Makie.hlines!(ax, [Unitful.ustrip(yunit, Measurements.value(report.miny))], color = :red, 
-            label = "$(obj) $(ylegendlabel) $(let v = round_wo_units(report.miny, digits = 2); isnan(Measurements.uncertainty(v)) ? Measurements.value(v) : v end)\n($(xlegendlabel): $(report.minx))")
+            label = "$(obj) $(ylegendlabel) $(let v = round_wo_units(report.miny, digits = 3); isnan(Measurements.uncertainty(v)) ? Measurements.value(v) : v end)\n($(xlegendlabel): $(report.minx))")
         Makie.band!(ax, [xlims...], Unitful.ustrip.(yunit, (Measurements.value(report.miny) .+ (-1,1) .* Measurements.uncertainty(report.miny)))..., color = (:red,0.2))
         
         legend_position != :none && Makie.axislegend(ax, position = legend_position)
