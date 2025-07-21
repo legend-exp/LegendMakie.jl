@@ -26,7 +26,7 @@ module LegendMakieLegendSpecFitsExt
     function round_wo_units(m::Measurements.Measurement; digits::Int=2)
         # copied from the truncated_print function in Measurements.jl
         val = if iszero(m.err) || !isfinite(m.err)
-            m.val
+            round(m.val, sigdigits = digits)
         else
             err_digits = -Base.hidigit(m.err, 10) + digits
             val_digits = if isfinite(m.val)
