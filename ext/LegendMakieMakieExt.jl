@@ -11,15 +11,20 @@ module LegendMakieMakieExt
     import MathTeXEngine
     import StatsBase
 
+    include("recipes/legend_theme.jl")
     include("recipes/recipes.jl")
     include("recipes/lplot.jl")
     include("recipes/lhist.jl")
     include("recipes/watermarks.jl")
 
     function __init__()
+
+        # Rebind into the main module namespace for end users
+        LegendMakie.LegendTheme = LegendTheme
+
         # maybe just use with_theme() in every plot recipe?
         @debug "Updating Makie theme to LEGEND theme"
-        Makie.update_theme!(LegendMakie.LegendTheme)
+        Makie.update_theme!(LegendTheme)
 
         # add Roboto as possible LaTeXString font
         MathTeXEngine.default_font_families["Roboto"] = MathTeXEngine.FontFamily(

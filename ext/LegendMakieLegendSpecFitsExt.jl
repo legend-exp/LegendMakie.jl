@@ -555,7 +555,7 @@ module LegendMakieLegendSpecFitsExt
         )
 
         data = Makie.hist!(ax, StatsBase.midpoints(first(report.h.edges)), weights = report.h.weights, bins = first(report.h.edges), color = LegendMakie.DiamondGrey)
-        fit = Makie.lines!(range(extrema(first(report.h.edges))..., length = 1000), x -> report.f_fit(x) * step(first(report.h.edges)), color = :black)
+        fit = Makie.lines!(range(extrema(first(report.h.edges))..., length = 1000), x -> Measurements.value(report.f_fit(x)) * step(first(report.h.edges)), color = :black)
         
         if legend_position != :none 
             Makie.axislegend(ax, show_label ? [data, fit] : [data],

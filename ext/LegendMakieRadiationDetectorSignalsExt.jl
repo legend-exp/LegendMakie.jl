@@ -9,21 +9,21 @@ module LegendMakieRadiationDetectorSignalsExt
 
     import LegendMakie: waveformplot!
 
-    Makie.@recipe(WaveformPlot, wf) do scene
-        Makie.Attributes(
-            linewidth = 1,
-        )
+    Makie.@recipe WaveformPlot (wf,) begin 
+        cycle = [:color]
+        color = @inherit linecolor
+        joinstyle = @inherit joinstyle
+        linecap = @inherit linecap
+        alpha = 1.0
+        linewidth = 1
+        linestyle = nothing
+        label = nothing
     end
         
-    # Needed for creatings legend using Makie recipes
-    # https://discourse.julialang.org/t/makie-defining-legend-output-for-a-makie-recipe/121567
-    function Makie.get_plots(p::WaveformPlot)
-        return p.plots
-    end
-
     function Makie.plot!(p::WaveformPlot{<:Tuple{<:RadiationDetectorSignals.RDWaveform}})
         wf = p.wf[]
-        Makie.lines!(p, wf.time, wf.signal; p.attributes...)
+        attr = Makie.Attributes(p)
+        Makie.lines!(p, attr, wf.time, wf.signal)
         p
     end
 

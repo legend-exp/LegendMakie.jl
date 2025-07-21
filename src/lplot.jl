@@ -1,5 +1,13 @@
 # This file is a part of LegendMakie.jl, licensed under the MIT License (MIT).
 
+"""
+    const LegendTheme
+
+Makie Theme based on the LEGEND-specific style guide.
+
+"""
+LegendTheme = missing
+export LegendTheme
 
 """
     lplot(objs...)

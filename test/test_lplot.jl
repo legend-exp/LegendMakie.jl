@@ -79,7 +79,7 @@ end
                 ))
             
             result, report = LegendSpecFits.qc_window_cut(t, config, (:x1, :x2))
-            @test_nowarn lplot(report, title = "Test")
+            @test_nowarn lplot(report, figsize = (600,900), title = "Test")
         end
 
         @testset "Filter optimization" begin
