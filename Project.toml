@@ -1,6 +1,6 @@
 name = "LegendMakie"
 uuid = "ce9a434a-d062-4f11-9371-3059ddb1c48a"
-version = "0.1.7"
+version = "0.1.8"
 
 [weakdeps]
 Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
