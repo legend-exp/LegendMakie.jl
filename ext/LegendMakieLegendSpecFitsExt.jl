@@ -39,6 +39,15 @@ module LegendMakieLegendSpecFitsExt
         Measurements.measurement(val, round(m.err, sigdigits=digits))
     end
 
+    # function to rebin a histogram
+    function rebin_histogram(h::StatsBase.Histogram, factor::Int)
+        nbins = length(h.weights)
+        new_nbins = div(nbins, factor)
+        new_weights = [sum(h.weights[(i-1)*factor+1:i*factor]) for i in 1:new_nbins]
+        new_edges = h.edges[1][1:factor:end]
+        StatsBase.Histogram(new_edges, new_weights)
+    end
+
     # function to compose labels when errorbars are scaled
     function label_errscaling(xerrscaling::Real, yerrscaling::Real = 1)
         result = String[]
@@ -613,17 +622,23 @@ module LegendMakieLegendSpecFitsExt
     function LegendMakie.lplot!(
             report::NamedTuple{(:f_calib, :h_cal, :h_uncal, :c, :peak_positions, :threshold)},
             cal_lines::Vector{<:Unitful.Energy} = typeof(1.0u"keV")[];
-            e_unit = u"keV", title::AbstractString = "", xlabel = "Energy ($(e_unit))", ylabel = "Counts / $(round(step(first(report.h_cal.edges)), digits = 2)) keV",
-            yscale = Makie.log10, xlims = (0,3000), ylims = (0.9, maximum(report.h_cal.weights)*1.2),
+            e_unit = u"keV", e_label = "e_fc", lines_label = Makie.rich(Makie.superscript("228"), "Th Calibration Lines"),
+            title::AbstractString = "", xlabel = "Energy ($(e_unit))", ylabel = "Counts / $(round(step(first(report.h_cal.edges)), digits = 2)) keV",
+            yscale = Makie.log10, xlims = (0,3000), ylims = nothing, rebin_factor = 1, 
             xticks = 0:250:3000, legend_position = :rt,
             watermark::Bool = true, final::Bool = !isempty(title), kwargs...
         )
 
+        # get h_cal
+        h_cal = rebin_histogram(report.h_cal, rebin_factor)
+        ylims = isnothing(ylims) ? (0.9, maximum(h_cal.weights)*1.2) : ylims
+
+        # create figure
         fig = Makie.current_figure()
         ax = Makie.Axis(fig[1,1]; limits = (xlims, ylims), title, xticks, xlabel, ylabel, yscale)
 
-        Makie.stephist!(ax, StatsBase.midpoints(first(report.h_cal.edges)), weights = replace(report.h_cal.weights, 0=>1e-10), bins = first(report.h_cal.edges), label = "e_fc")
-        !isempty(cal_lines) && Makie.vlines!(ax, Unitful.ustrip.(e_unit, cal_lines), color = :red, label = "Th228 Calibration Lines")
+        Makie.stephist!(ax, StatsBase.midpoints(first(h_cal.edges)), weights = replace(h_cal.weights, 0=>1e-10), bins = first(h_cal.edges), label = e_label)
+        !isempty(cal_lines) && Makie.vlines!(ax, Unitful.ustrip.(e_unit, cal_lines), color = :red, label = lines_label)
         legend_position != :none && Makie.axislegend(ax, position = legend_position, framevisible = true, framecolor = :lightgray)
             
         Makie.current_axis!(ax)
@@ -634,16 +649,20 @@ module LegendMakieLegendSpecFitsExt
     # plot report from simple_calibration
     function LegendMakie.lplot!(
             report::NamedTuple{(:h_calsimple, :h_uncal, :c, :peak_guess, :peakhists, :peakstats)};
-            cal::Bool = true, h = StatsBase.normalize(cal ? report.h_calsimple : report.h_uncal, mode = :density),
-            title::AbstractString = "", titlegap = 2, titlesize = 18, label = "Energy",
+            cal::Bool = true, title::AbstractString = "", titlegap = 2, titlesize = 18, label = "Energy",
             xlims = (0, cal ? 3000 : 1.2*report.peak_guess), xlabel = "Energy ($(cal ? "keV" : "ADC"))", 
             xticks = cal ? (0:300:3000) : (0:50000:1.2*report.peak_guess),
-            ylims = extrema(filter(x -> x > 0, h.weights)) .* (0.99, 1.2 * 1.1), 
-            ylabel = "Counts / $(round(step(first(h.edges)), digits = 2)) $(cal ? "keV" : "ADC")", 
-            yscale = Makie.log10,
+            ylims = nothing, ylabel = nothing,
+            yscale = Makie.log10, rebin_factor = 1, 
             watermark::Bool = true, final::Bool = !isempty(title), kwargs...
         )
         
+        # get histogram
+        h = rebin_histogram(StatsBase.normalize(cal ? report.h_calsimple : report.h_uncal, mode = :density), rebin_factor)
+        ylims = isnothing(ylims) ? extrema(filter(x -> x > 0, h.weights)) .* (0.99, 1.2 * 1.1) : ylims
+        ylabel = isnothing(ylabel) ? "Counts / $(round(step(first(h.edges)), digits = 2)) $(cal ? "keV" : "ADC")" : ylabel
+
+        # create figure
         fig = Makie.current_figure()
         
         # select correct histogram
