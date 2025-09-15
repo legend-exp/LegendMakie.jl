@@ -924,7 +924,7 @@ module LegendMakieLegendSpecFitsExt
     # LQ plots
     # recipe for report from ctc_lq
     function LegendMakie.lplot!( 
-        report::NamedTuple{(:dep_left, :dep_right, :opt_bounds, :fct, :bin_width, :lq_peak, :lq_ctc_corrected, :lq_ctc_normalized, :qdrift_peak, :h_before, :h_after, :h_after_norm, :σ_before, :σ_after, :σ_after_norm, :report_before, :report_after, :report_after_norm)};
+        report::NamedTuple{(:dep_left, :dep_right, :opt_bounds, :fct, :bin_width, :lq_peak, :lq_ctc_corrected, :lq_ctc_normalized, :qdrift_peak, :h_before, :h_after, :h_after_norm, :σ_before, :σ_after, :σ_after_norm, :report_before, :report_after, :report_after_norm, :vis)};
             label_before = "Before correction", label_after = "After correction", levels = 15,
             xlims = (0,2), ylims = StatsBase.quantile.(Ref(report.qdrift_peak), (0.005, 0.995)), xticks = Makie.WilkinsonTicks(6,k_min=5), yticks = Makie.WilkinsonTicks(6,k_min=4),
             title::AbstractString = "", titlesize = 18, titlegap = 0, norm::Bool = false,
@@ -982,6 +982,55 @@ module LegendMakieLegendSpecFitsExt
         Makie.current_axis!(ax3)
         watermark && LegendMakie.add_watermarks!(; kwargs...)
         
+        fig
+    end
+
+    function LegendMakie.lplot!(
+            vis::NamedTuple{(:kind, :pol_order, :opt_bounds, :f_minimize)}, fct::AbstractVector{<:Real};
+            title::AbstractString = "", titlesize = 18, titlegap = 2, xlabel = "fct", ylabel = "σ(fct)", 
+            watermark::Bool = true, final::Bool = !isempty(title), kwargs...
+        )
+
+        fig = Makie.current_figure()
+        ax = Makie.Axis(fig[1, 1]; title, titlesize, titlegap, xlabel, ylabel)
+
+
+
+        if vis.kind == :_1D
+            lb, ub = vis.opt_bounds.lower[1], vis.opt_bounds.upper[1]
+            span = ub - lb
+            fct_range = range(lb - 0.5*span, ub + 0.5*span, length=200)
+            σ_values = [vis.f_minimize([f]) for f in fct_range]
+
+            Makie.scatter!(ax, collect(fct_range), σ_values; markersize=4, label="σ(fct)")
+            Makie.vlines!(ax, [fct[1]]; color=:red, linestyle=:dash, label="Optimal")
+            Makie.vlines!(ax, [lb, ub]; color=:black, linestyle=:dot, label="Bounds")
+            Makie.axislegend(ax)
+
+        elseif vis.kind == :_2D
+            lb1, lb2 = vis.opt_bounds.lower
+            ub1, ub2 = vis.opt_bounds.upper
+            f1_range = range(lb1 - 0.5*(ub1-lb1), ub1 + 0.5*(ub1-lb1), length=60)
+            f2_range = range(lb2 - 0.5*(ub2-lb2), ub2 + 0.5*(ub2-lb2), length=60)
+            σ_grid = [vis.f_minimize([f1,f2]) for f1 in f1_range, f2 in f2_range]
+
+            Makie.heatmap!(ax, collect(f1_range), collect(f2_range), σ_grid;
+                        colormap=:viridis,
+                        colorrange=(minimum(σ_grid), maximum(σ_grid)))
+            Makie.scatter!(ax, [fct[1]], [fct[2]]; color=:red, markersize=10, strokewidth=2, label="Optimal")
+            xs = [lb1, ub1, ub1, lb1, lb1]
+            ys = [lb2, lb2, ub2, ub2, lb2]
+            Makie.lines!(ax, xs, ys; color=:black, linestyle=:dot, linewidth=2, label="Bounds")
+            Makie.axislegend(ax)
+
+        else
+            @warn "Unknown visualization kind: $(vis.kind)"
+            return nothing
+        end
+
+        Makie.current_axis!(ax)
+        watermark && LegendMakie.add_watermarks!(; kwargs...)
+
         fig
     end
 
