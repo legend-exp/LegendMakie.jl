@@ -7,8 +7,8 @@ import LegendSpecFits
 import LegendDataManagement
 import LegendHDF5IO
 import LegendTestData
-testdata_dir = joinpath(LegendTestData.legend_test_data_path(), "data", "legend")
-ENV["LEGEND_DATA_CONFIG"] = joinpath(testdata_dir, "config.json")
+
+include("testing_utils.jl")
 
 import Dates
 import Distributions
@@ -284,7 +284,7 @@ end
         @test isdir(testdir)
 
         # link it in the legend data config
-        pd = PropDicts.readprops(LegendTestData.activate_legend_test_data_config())
+        pd = PropDicts.readprops(julia_config)
         pd.setups.l200.paths[Symbol("tier/raw")] = testdir
         # pd.setups.l200.paths[Symbol("tier/raw")] 
         PropDicts.writeprops(joinpath(testdir, "test_config.json"), pd)
@@ -311,9 +311,9 @@ end
         end
 
         # plot the event
-        ch = LegendDataManagement.ChannelId(11)
-        t_cal = 1.6786153e9u"s"
-        t_phy = 1.6787017e9u"s"
+        ch = LegendDataManagement.ChannelId(1234568)
+        t_cal = 1.6566337e9u"s"
+        t_phy = 1.6567201e9u"s"
 
         @testset "Event plots" begin 
             @test_nowarn lplot(data, t_cal, figsize = (800,600), xlims = (0,128))
