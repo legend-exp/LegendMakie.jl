@@ -941,6 +941,118 @@ module LegendMakieLegendSpecFitsExt
 
 
     # LQ plots
+    # recipe for report from ctc_lq
+    function LegendMakie.lplot!( 
+        report::NamedTuple{(:dep_left, :dep_right, :opt_bounds, :fct, :bin_width, :lq_peak, :lq_ctc_corrected, :lq_ctc_normalized, :qdrift_peak, :h_before, :h_after, :h_after_norm, :σ_before, :σ_after, :σ_after_norm, :report_before, :report_after, :report_after_norm, :vis)};
+            label_before = "Before correction", label_after = "After correction", levels = 15,
+            xlims = (0,2), ylims = StatsBase.quantile.(Ref(report.qdrift_peak), (0.005, 0.995)), xticks = Makie.WilkinsonTicks(6,k_min=5), yticks = Makie.WilkinsonTicks(6,k_min=4),
+            title::AbstractString = "", titlesize = 18, titlegap = 0, norm::Bool = false,
+            xlabel = "LQ classifier", ylabel = "Qdrift / E",
+            watermark::Bool = true, kwargs...
+        )
+
+        # Best results for figsize (600,600)
+        fig = Makie.current_figure()
+        
+        g = Makie.GridLayout(fig[1,1])
+        
+        ax = Makie.Axis(g[1,1], limits = (xlims,(0,nothing)), ylabel = "Counts / $(round(step(first(report.h_before.edges)), digits = 2))")
+        h_before = Makie.plot!(ax, report.h_before, color = :darkgrey)
+        h_after  = Makie.plot!(ax, norm ? report.h_after_norm : report.h_after, color = (:purple, 0.5))
+        
+        ax3 = Makie.Axis(g[1,2])
+        Makie.hidedecorations!(ax3)
+        Makie.hidespines!(ax3)
+        Makie.axislegend(ax3, [h_before, h_after], [label_before, label_after], position = :lt)
+        
+        ax2 = Makie.Axis(g[2,1]; limits = (xlims, ylims), xticks, yticks, xlabel, ylabel)
+        k_before = KernelDensity.kde((report.lq_peak, report.qdrift_peak))
+        k_after = KernelDensity.kde((norm ? report.lq_ctc_normalized : report.lq_ctc_corrected, report.qdrift_peak))
+        Makie.contourf!(ax2, k_before.x, k_before.y, k_before.density, levels = levels, colormap = :binary)
+        Makie.contour!(ax2, k_before.x, k_before.y, k_before.density, levels = levels - 1, color = :white)
+        Makie.contour!(ax2, k_after.x, k_after.y, k_after.density, levels = levels - 1, colormap = :plasma)
+        
+        ax3 = Makie.Axis(g[2,2], limits = ((0,nothing),ylims), xlabel = "Counts / 0.1")
+        Makie.plot!(ax3, StatsBase.fit(StatsBase.Histogram, report.qdrift_peak, 0:0.1:ylims[2]+0.1), color = :darkgrey, direction = :x)
+        ax3.xticks = Makie.WilkinsonTicks(3, k_min = 3, k_max=4)
+        
+        # Formatting
+        Makie.linkxaxes!(ax,ax2)
+        Makie.hidexdecorations!(ax)
+        Makie.rowgap!(g, 0)
+        Makie.rowsize!(g, 1, Makie.Auto(0.5))
+        Makie.linkyaxes!(ax2,ax3)
+        Makie.hideydecorations!(ax3)
+        Makie.colgap!(g, 0)
+        Makie.colsize!(g, 2, Makie.Auto(0.5))
+        xspace = maximum(Makie.tight_xticklabel_spacing!, (ax2, ax3))
+        ax2.xticklabelspace = xspace
+        ax3.xticklabelspace = xspace
+        yspace = maximum(Makie.tight_yticklabel_spacing!, (ax, ax2))
+        ax.yticklabelspace = yspace
+        ax2.yticklabelspace = yspace
+
+        # add general title
+        if !isempty(title)
+            Makie.Label(g[1,:,Makie.Top()], title, padding = (0,0,titlegap,0), fontsize = titlesize, font = :bold)
+        end
+        
+        # add watermarks
+        Makie.current_axis!(ax3)
+        watermark && LegendMakie.add_watermarks!(; kwargs...)
+        
+        fig
+    end
+
+    function LegendMakie.lplot!(
+            vis::NamedTuple{(:kind, :pol_order, :opt_bounds, :f_minimize)}, fct::AbstractVector{<:Real};
+            title::AbstractString = "", titlesize = 18, titlegap = 2, xlabel = "fct", ylabel = "σ(fct)", 
+            watermark::Bool = true, final::Bool = !isempty(title), kwargs...
+        )
+
+        fig = Makie.current_figure()
+        ax = Makie.Axis(fig[1, 1]; title, titlesize, titlegap, xlabel, ylabel)
+
+
+
+        if vis.kind == :_1D
+            lb, ub = vis.opt_bounds.lower[1], vis.opt_bounds.upper[1]
+            span = ub - lb
+            fct_range = range(lb - 0.5*span, ub + 0.5*span, length=200)
+            σ_values = [vis.f_minimize([f]) for f in fct_range]
+
+            Makie.scatter!(ax, collect(fct_range), σ_values; markersize=4, label="σ(fct)")
+            Makie.vlines!(ax, [fct[1]]; color=:red, linestyle=:dash, label="Optimal")
+            Makie.vlines!(ax, [lb, ub]; color=:black, linestyle=:dot, label="Bounds")
+            Makie.axislegend(ax)
+
+        elseif vis.kind == :_2D
+            lb1, lb2 = vis.opt_bounds.lower
+            ub1, ub2 = vis.opt_bounds.upper
+            f1_range = range(lb1 - 0.5*(ub1-lb1), ub1 + 0.5*(ub1-lb1), length=60)
+            f2_range = range(lb2 - 0.5*(ub2-lb2), ub2 + 0.5*(ub2-lb2), length=60)
+            σ_grid = [vis.f_minimize([f1,f2]) for f1 in f1_range, f2 in f2_range]
+
+            Makie.heatmap!(ax, collect(f1_range), collect(f2_range), σ_grid;
+                        colormap=:viridis,
+                        colorrange=(minimum(σ_grid), maximum(σ_grid)))
+            Makie.scatter!(ax, [fct[1]], [fct[2]]; color=:red, markersize=10, strokewidth=2, label="Optimal")
+            xs = [lb1, ub1, ub1, lb1, lb1]
+            ys = [lb2, lb2, ub2, ub2, lb2]
+            Makie.lines!(ax, xs, ys; color=:black, linestyle=:dot, linewidth=2, label="Bounds")
+            Makie.axislegend(ax)
+
+        else
+            @warn "Unknown visualization kind: $(vis.kind)"
+            return nothing
+        end
+
+        Makie.current_axis!(ax)
+        watermark && LegendMakie.add_watermarks!(; kwargs...)
+
+        fig
+    end
+
     function LegendMakie.lplot!(
             report::NamedTuple{(:hist_dep, :hist_sb1, :hist_sb2, :hist_subtracted, :hist_corrected)};
             title::AbstractString = "", titlesize = 18, titlegap = 2, legend_position = :rt, 
@@ -1049,6 +1161,7 @@ module LegendMakieLegendSpecFitsExt
         fig
     end
 
+    # recipe for report of lq_ctc_lin_fit
     function LegendMakie.lplot!(
             report::NamedTuple{(:lq_report, :drift_report, :lq_box, :drift_time_func, :dep_left, :dep_right)},
             e_cal, dt_eff, lq_e_corr, plot_type::Symbol = :whole;
