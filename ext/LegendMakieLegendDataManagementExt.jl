@@ -5,13 +5,16 @@ module LegendMakieLegendDataManagementExt
     import LegendMakie
     import LegendDataManagement
 
+    import ArraysOfArrays: flatview
     import Dates
     import Format
+    import LegendDataTypes: decode_data
     import Makie
     import Measurements
     import PropDicts
     import TypedTables
     import Unitful
+    import RadiationDetectorSignals
 
     import LegendMakie: parameterplot!
     import Unitful: @u_str
@@ -200,9 +203,8 @@ module LegendMakieLegendDataManagementExt
             
             fig = Makie.current_figure()          
             g = Makie.GridLayout(fig[1,1])
-            axs = [ begin
-                ax = Makie.Axis(g[s,1], 
-                    dim1_conversion = Makie.UnitfulConversion(xunit, units_in_label=false),
+            axs = [begin
+                ax = Makie.Axis(g[s,1],
                     ytickformat = x -> string.(round.(Int,x)), 
                     palette = (color = Makie.wong_colors(),), 
                     limits = (xlims ,nothing), 
@@ -212,11 +214,16 @@ module LegendMakieLegendDataManagementExt
                     title = "$sys - Event" * (show_unixtime ? " $(Dates.unix2datetime(Unitful.ustrip(u"s", ts)))" : "")
                 )
                 chinfo = LegendDataManagement.channelinfo(data, fk; system=sys, only_processable=true)
-                for (c, chinfo_ch) in enumerate(chinfo)
-                    for (p, p_wvf) = enumerate(system[sys])
-                        idx = findfirst(isequal(ts), raw[Symbol(chinfo_ch.channel)].timestamp)
-                        LegendMakie.waveformplot!(ax, getproperty(raw[Symbol(chinfo_ch.channel)], p_wvf)[idx])
-                    end
+                for p_wvf in system[sys]
+                    system_wvfs = convert(RadiationDetectorSignals.ArrayOfRDWaveforms, 
+                                    decode_data([begin
+                                        idx = findfirst(isequal(ts), raw[Symbol(chinfo_ch.channel)].timestamp)
+                                        getproperty(raw[Symbol(chinfo_ch.channel)], p_wvf)[idx]
+                                    end for (c, chinfo_ch) in enumerate(chinfo)]))
+                    t = Unitful.ustrip.(xunit, first(system_wvfs).time)
+                    e_minmax = maximum.(system_wvfs.signal) .- minimum.(system_wvfs.signal)
+                    e_minmax_colors = Makie.resample_cmap(:coolwarm, round(Int, maximum(e_minmax)))
+                    Makie.series!(ax, collect(t), reshape(flatview(system_wvfs.signal), length(first(system_wvfs).signal), :)', solid_color=e_minmax_colors[e_minmax])
                 end
                 ax
             end for (s,sys) in enumerate(sort(collect(keys(system))))]
