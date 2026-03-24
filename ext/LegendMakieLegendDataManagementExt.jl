@@ -215,6 +215,10 @@ module LegendMakieLegendDataManagementExt
                 )
                 chinfo = LegendDataManagement.channelinfo(data, fk; system=sys, only_processable=true)
                 for p_wvf in system[sys]
+                    if isempty(chinfo)
+                        @warn "No processable channels found for system $sys, skipping waveform plot"
+                        continue
+                    end
                     system_wvfs = convert(RadiationDetectorSignals.ArrayOfRDWaveforms, 
                                     decode_data([begin
                                         idx = findfirst(isequal(ts), raw[Symbol(chinfo_ch.channel)].timestamp)
