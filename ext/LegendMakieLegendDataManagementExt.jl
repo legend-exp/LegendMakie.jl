@@ -7,11 +7,13 @@ module LegendMakieLegendDataManagementExt
 
     import Dates
     import Format
+    import LegendDataTypes: decode_data
     import Makie
     import Measurements
     import PropDicts
     import TypedTables
     import Unitful
+    import RadiationDetectorSignals
 
     import LegendMakie: parameterplot!
     import Unitful: @u_str
@@ -124,8 +126,8 @@ module LegendMakieLegendDataManagementExt
         )
         det = LegendDataManagement.DetectorId(det)  # convert to DetectorId if necessary
         
-        raw = LegendDataManagement.read_ldata(data, plot_tier, fk, det)
-        idx = findfirst(isequal(ts), raw.timestamp)
+        # only the row of the event is read
+        raw = LegendDataManagement.read_ldata(Tuple(plot_waveform), data, plot_tier, fk, [ts], det)
         
         # best results for figure size (800,400)
         fig = Makie.current_figure()
@@ -145,7 +147,7 @@ module LegendMakieLegendDataManagementExt
             label = if show_label && p == 1 
                 "$det ($(LegendDataManagement.channelinfo(data, fk, det).channel))"
             end
-            LegendMakie.waveformplot!(ax, getproperty(raw, p_wvf)[idx]; label)
+            LegendMakie.waveformplot!(ax, only(getproperty(raw, p_wvf)); label)
         end
 
         # add legend
@@ -197,13 +199,10 @@ module LegendMakieLegendDataManagementExt
             fig
             
         elseif fk.category == LegendDataManagement.DataCategory(:phy)
-            raw = LegendDataManagement.read_ldata(data, plot_tier, fk)
-            
             fig = Makie.current_figure()          
             g = Makie.GridLayout(fig[1,1])
-            axs = [ begin
-                ax = Makie.Axis(g[s,1], 
-                    dim1_conversion = Makie.UnitfulConversion(xunit, units_in_label=false),
+            axs = [begin
+                ax = Makie.Axis(g[s,1],
                     ytickformat = x -> string.(round.(Int,x)), 
                     palette = (color = Makie.wong_colors(),), 
                     limits = (xlims ,nothing), 
@@ -213,10 +212,17 @@ module LegendMakieLegendDataManagementExt
                     title = "$sys - Event" * (show_unixtime ? " $(Dates.unix2datetime(Unitful.ustrip(u"s", ts)))" : "")
                 )
                 chinfo = LegendDataManagement.channelinfo(data, fk; system=sys, only_processable=true)
-                for (c, chinfo_ch) in enumerate(chinfo)
-                    for (p, p_wvf) = enumerate(system[sys])
-                        idx = findfirst(isequal(ts), raw[Symbol(chinfo_ch.detector)].timestamp)
-                        LegendMakie.waveformplot!(ax, getproperty(raw[Symbol(chinfo_ch.detector)], p_wvf)[idx])
+                if isempty(chinfo)
+                    @warn "No processable channels found for system $sys, skipping waveform plot"
+                else
+                    # Only the row of the event is read from each channel, keyed by detector
+                    raw = LegendDataManagement.read_ldata(Tuple(system[sys]), data, plot_tier, fk, [ts], chinfo.detector)
+                    for p_wvf in system[sys]
+                        wvfs = RadiationDetectorSignals.ArrayOfRDWaveforms(decode_data([only(getproperty(tbl, p_wvf)) for tbl in raw]))
+                        # one line per channel, colored by the signal amplitude
+                        amplitude = maximum.(wvfs.signal) .- minimum.(wvfs.signal)
+                        colors = get(Makie.cgrad(:coolwarm), amplitude, :extrema)
+                        Makie.series!(ax, Unitful.ustrip.(xunit, first(wvfs).time), stack(wvfs.signal)', solid_color = colors)
                     end
                 end
                 ax
