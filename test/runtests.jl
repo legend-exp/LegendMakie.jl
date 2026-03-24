@@ -3,8 +3,10 @@
 import Test
 
 # checkout main branch of LegendSpecFits and LegendManagement
-import Pkg; Pkg.add(url = "https://github.com/legend-exp/LegendSpecFits.jl", rev="main")
-import Pkg; Pkg.add(url = "https://github.com/legend-exp/LegendDataManagement.jl", rev="main")
+# import Pkg; Pkg.add(url = "https://github.com/legend-exp/LegendSpecFits.jl", rev="main")
+# import Pkg; Pkg.add(url = "https://github.com/legend-exp/LegendDataManagement.jl", rev="main")
+
+ENV["JULIA_DEBUG"] = "Main"
 
 Test.@testset "Package LegendMakie" begin
     include("test_aqua.jl")
