@@ -347,16 +347,17 @@ end
         t_phy = Dates.datetime2unix(Dates.DateTime(fk_phy))u"s" + 100u"s"
 
         @testset "Event plots" begin 
-            @test_nowarn lplot(data, t_cal, figsize = (800,600), xlims = (0,128))
-            @test_nowarn lplot(data, t_phy, figsize = (800,600), xlims = (0,128))
-            @test_nowarn lplot(data, Dates.DateTime(Dates.unix2datetime(t_cal ./ u"s")))
+            @test_nowarn LegendMakie.lplot(data, t_cal, figsize = (800,600), xlims = (0,128))
+            @test LegendMakie.lplot!(data, t_phy, figsize = (800,600), xlims = (0,128)) isa Makie.Figure
+            @test_nowarn LegendMakie.lplot(data, t_phy, figsize = (800,600), xlims = (0,128); system=Dict(:geds => [:waveform_windowed]))
+            @test_nowarn LegendMakie.lplot(data, Dates.DateTime(Dates.unix2datetime(t_cal ./ u"s")))
         end
 
         det = LegendDataManagement.DetectorId(:V99000A)
         @testset "Detector plots" begin 
-            @test_nowarn lplot(data, t_cal, det, figsize = (800,380), xlims = (0,128))
+            @test lplot(data, t_cal, det, figsize = (800,380), xlims = (0,128)) isa Makie.Figure
             @test_throws ArgumentError lplot(data, t_cal .+ 1u"s", det, figsize = (800,380), xlims = (0,128))
-            @test_nowarn lplot(data, t_phy, det, figsize = (800,380), xlims = (0,128), show_label = false)
+            @test lplot(data, t_phy, det, figsize = (800,380), xlims = (0,128), show_label = false) isa Makie.Figure
         end
 
         # remove test repository
