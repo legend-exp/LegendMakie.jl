@@ -118,12 +118,14 @@ module LegendMakieLegendDataManagementExt
 
 
     function LegendMakie.lplot!(
-            data::LegendDataManagement.LegendData, fk::LegendDataManagement.FileKey, ts::Unitful.Time{<:Real}, ch::LegendDataManagement.ChannelIdLike; 
+            data::LegendDataManagement.LegendData, fk::LegendDataManagement.FileKey, ts::Unitful.Time{<:Real}, ch::Union{<:LegendDataManagement.ChannelIdLike, <:LegendDataManagement.DetectorIdLike}; 
             plot_tier = LegendDataManagement.DataTier(:raw), plot_waveform = [:waveform_presummed], show_unixtime = false, xunit::Unitful.Units = u"µs", 
             xlims = nothing, show_title::Bool = true, show_label::Bool = true, watermark::Bool = true, final::Bool = true
         )
+
+        det = Base.get_extension(LegendDataManagement, :LegendDataManagementLegendHDF5IOExt)._get_detectorid(data, fk, ch)
         
-        raw = LegendDataManagement.read_ldata(data, plot_tier, fk, ch)
+        raw = LegendDataManagement.read_ldata(data, plot_tier, fk, det)
         idx = findfirst(isequal(ts), raw.timestamp)
         
         # best results for figure size (800,400)
@@ -138,11 +140,11 @@ module LegendMakieLegendDataManagementExt
             xticks = Makie.WilkinsonTicks(6,k_min=5),
             xlabel = "Time ($xunit)", ylabel = "Signal", 
             titlefont = :regular, 
-            title = "$(LegendDataManagement.channelinfo(data, fk, ch).system) - Event" * (show_unixtime ? " $(Dates.unix2datetime(Unitful.ustrip(u"s", ts)))" : "")
+            title = "$(LegendDataManagement.channelinfo(data, fk, det).system) - Event" * (show_unixtime ? " $(Dates.unix2datetime(Unitful.ustrip(u"s", ts)))" : "")
         )
         for (p, p_wvf) in enumerate(plot_waveform)
             label = if show_label && p == 1 
-                "$(LegendDataManagement.channelinfo(data, fk, ch).detector) ($(ch))"
+                "$det ($(LegendDataManagement.channelinfo(data, fk, det).channel))"
             end
             LegendMakie.waveformplot!(ax, getproperty(raw, p_wvf)[idx]; label)
         end
@@ -173,24 +175,24 @@ module LegendMakieLegendDataManagementExt
         return if fk.category == LegendDataManagement.DataCategory(:cal)
             @debug "Got $(fk.category) event, looking for raw event"
             timestamps = LegendDataManagement.read_ldata(:timestamp, data, LegendDataManagement.DataTier(:raw), fk)
-            ch_ts = ""
-            for ch in keys(timestamps)
-                if any(ts .== timestamps[ch].timestamp)
-                    ch_ts = string(ch)
-                    @debug "Found event $ts in channel $ch"
+            det_ts = ""
+            for det in keys(timestamps)
+                if any(ts .== timestamps[det].timestamp)
+                    det_ts = string(det)
+                    @debug "Found event $ts in detector $det"
                     break
                 end
             end
-            isempty(ch_ts) && throw(ArgumentError("Timestamp $ts not found in the data"))
+            isempty(det_ts) && throw(ArgumentError("Timestamp $ts not found in the data"))
             
-            ch = LegendDataManagement.ChannelId(ch_ts)
-            chinfo_ch = LegendDataManagement.channelinfo(data, fk, ch)
+            det = LegendDataManagement.DetectorId(det_ts)
+            chinfo_det = LegendDataManagement.channelinfo(data, fk, det)
             
             # validate the entry to plot
-            chinfo_ch.system != :geds && throw(ArgumentError("Only HPGe cal events are supported"))
-            only_processable && !chinfo_ch.processable && throw(ArgumentError("Channel $ch is not processable"))
+            chinfo_det.system != :geds && throw(ArgumentError("Only HPGe cal events are supported"))
+            only_processable && !chinfo_det.processable && throw(ArgumentError("Detector $det is not processable"))
 
-            fig = LegendMakie.lplot!(data, fk, ts, ch; plot_waveform = system[:geds], plot_tier, show_unixtime, watermark = false, xlims, kwargs...)
+            fig = LegendMakie.lplot!(data, fk, ts, det; plot_waveform = system[:geds], plot_tier, show_unixtime, watermark = false, xlims, kwargs...)
             watermark && LegendMakie.add_watermarks!(; final)
                         
             fig
@@ -214,8 +216,8 @@ module LegendMakieLegendDataManagementExt
                 chinfo = LegendDataManagement.channelinfo(data, fk; system=sys, only_processable=true)
                 for (c, chinfo_ch) in enumerate(chinfo)
                     for (p, p_wvf) = enumerate(system[sys])
-                        idx = findfirst(isequal(ts), raw[Symbol(chinfo_ch.channel)].timestamp)
-                        LegendMakie.waveformplot!(ax, getproperty(raw[Symbol(chinfo_ch.channel)], p_wvf)[idx])
+                        idx = findfirst(isequal(ts), raw[Symbol(chinfo_ch.detector)].timestamp)
+                        LegendMakie.waveformplot!(ax, getproperty(raw[Symbol(chinfo_ch.detector)], p_wvf)[idx])
                     end
                 end
                 ax
@@ -243,9 +245,10 @@ module LegendMakieLegendDataManagementExt
     end
 
 
-    function LegendMakie.lplot!(data::LegendDataManagement.LegendData, ts::Unitful.Time{<:Real}, ch::LegendDataManagement.ChannelIdLike; kwargs...)
+    function LegendMakie.lplot!(data::LegendDataManagement.LegendData, ts::Unitful.Time{<:Real}, ch::Union{<:LegendDataManagement.ChannelIdLike, <:LegendDataManagement.DetectorIdLike}; kwargs...)
         fk = LegendDataManagement.find_filekey(data, ts)
-        LegendMakie.lplot!(data, fk, ts, ch; kwargs...)
+        det = Base.get_extension(LegendDataManagement, :LegendDataManagementLegendHDF5IOExt)._get_detectorid(data, fk, ch)
+        LegendMakie.lplot!(data, fk, ts, det; kwargs...)
     end
 
     # TODO: check rounding of `Dates.DateTime`

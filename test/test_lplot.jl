@@ -300,8 +300,8 @@ end
             #create fake files
             chinfo = LegendDataManagement.channelinfo(data, fk, system = :geds)
             LegendHDF5IO.lh5open(joinpath(testdir, cat, period, run, "$(fk)-tier_raw.lh5"), "w") do h
-                for ch in chinfo.channel
-                    h["$(ch)/raw"] = TypedTables.Table(
+                for det in chinfo.detector
+                    h["$(det)/raw"] = TypedTables.Table(
                         timestamp = [Dates.datetime2unix(Dates.DateTime(fk))u"s" + 100u"s"],
                         waveform_presummed = [RadiationDetectorSignals.RDWaveform(range(0u"μs", 128u"μs", length = 1000), rand(UInt8, 1000))],
                         waveform_windowed = [RadiationDetectorSignals.RDWaveform(range(0u"μs", 128u"μs", length = 1000), rand(UInt8, 1000))],
@@ -311,7 +311,6 @@ end
         end
 
         # plot the event
-        ch = LegendDataManagement.ChannelId(1234568)
         t_cal = 1.6566337e9u"s"
         t_phy = 1.6567201e9u"s"
 
@@ -321,6 +320,15 @@ end
             @test_nowarn lplot(data, Dates.DateTime(Dates.unix2datetime(t_cal ./ u"s")))
         end
 
+        det = LegendDataManagement.DetectorId(:V99000A)
+        @testset "Detector plots" begin 
+            @test_nowarn lplot(data, t_cal, det, figsize = (800,380), xlims = (0,128))
+            @test_throws ArgumentError lplot(data, t_cal .+ 1u"s", det, figsize = (800,380), xlims = (0,128))
+            @test_nowarn lplot(data, t_phy, det, figsize = (800,380), xlims = (0,128), show_label = false)
+        end
+
+        # Old syntax
+        ch = LegendDataManagement.ChannelId(1234568)
         @testset "Channel plots" begin 
             @test_nowarn lplot(data, t_cal, ch, figsize = (800,380), xlims = (0,128))
             @test_throws ArgumentError lplot(data, t_cal .+ 1u"s", ch, figsize = (800,380), xlims = (0,128))
