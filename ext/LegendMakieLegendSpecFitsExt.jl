@@ -563,7 +563,7 @@ module LegendMakieLegendSpecFitsExt
             title, xlabel, ylabel, yticks, titlesize
         )
 
-        data = Makie.hist!(ax, StatsBase.midpoints(first(report.h.edges)), weights = report.h.weights, bins = first(report.h.edges), color = LegendMakie.DiamondGrey)
+        data = Makie.hist!(ax, StatsBase.midpoints(first(report.h.edges)), weights = report.h.weights, bins = first(report.h.edges), color = LegendMakie.DiamondGrey, fillto = 0.5*(ylims[1]))
         fit = Makie.lines!(range(extrema(first(report.h.edges))..., length = 1000), x -> Measurements.value(report.f_fit(x)) * step(first(report.h.edges)), color = :black)
         
         if legend_position != :none 
