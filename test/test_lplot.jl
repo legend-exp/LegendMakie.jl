@@ -171,6 +171,11 @@ end
             result_fit, report_fit = LegendSpecFits.fit_peaks(result_simple.peakhists, result_simple.peakstats, lines; e_unit=result_simple.unit, calib_type=:th228, m_cal_simple=m_cal_simple)
             @testset "Fit peaks for energy calibration" begin
                 @test_nowarn lplot(report_fit, figsize = (600, 400*length(report_fit)), watermark = false, title = "Test")
+                # a single peak: the data and the components in one legend, the data alone, no legend, a linear scale
+                @test_nowarn lplot(report_fit[:Tl208FEP], legend_position = :rt, title = "Test")
+                @test_nowarn lplot(report_fit[:Tl208FEP], show_components = false, legend_position = :lt, title = "Test")
+                @test_nowarn lplot(report_fit[:Tl208FEP], legend_position = :none, yscale = identity, title = "Test")
+                @test_nowarn lplot(report_fit[:Tl208FEP], show_label = false, title = "Test")
             end
             μ_fit = getfield.(getindex.(Ref(result_fit), lines), :centroid)
             result_calib, report_calib = LegendSpecFits.fit_calibration(1, μ_fit, energies)
