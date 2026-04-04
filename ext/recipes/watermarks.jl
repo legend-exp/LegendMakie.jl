@@ -8,7 +8,7 @@ function LegendMakie.add_juleana_logo!(args...; kwargs...)
     LegendMakie.add_logo!(args...; logofile = LegendMakie.JuleanaSimple, textcolor = :black, kwargs...)
 end
 
-function LegendMakie.add_logo!(; fontsize = 18, position = "outer right", textcolor = :black, logofile = LegendMakie.JuleanaSimple)
+function LegendMakie.add_logo!(; fontsize = 18, position = "outer right", textcolor = :black, logofile = LegendMakie.JuleanaSimple, show_date = true)
 
     fig = Makie.current_figure()
     ax = Makie.current_axis()
@@ -25,8 +25,8 @@ function LegendMakie.add_logo!(; fontsize = 18, position = "outer right", textco
 
     logo = FileIO.load(logofile)
     logowidth, logoheight = size(logo) .* font_scale
-    legend_suffix = (logofile == LegendMakie.LegendLogo ? "-200" : "") * " ⋅ " * 
-        Format.format("{:02d}-{:04d}", Dates.month(Dates.today()), Dates.year(Dates.today()))
+    legend_suffix = (logofile == LegendMakie.LegendLogo ? "-200" : "") * 
+        ifelse(show_date, " ⋅ " * Format.format("{:02d}-{:04d}", Dates.month(Dates.today()), Dates.year(Dates.today())), "")
 
     if position == "outer right"
         img = Makie.image!(fig.scene, Makie.rot180(logo))
@@ -70,14 +70,15 @@ function LegendMakie.add_production!(prodname::AbstractString; fontsize::Real = 
 end
 
 function LegendMakie.add_watermarks!(;
-        legend_logo::Bool = false, juleana_logo::Bool = true, position::String = "outer right",
+        legend_logo::Bool = false, juleana_logo::Bool = true, show_date::Bool = true,
+        position::String = "outer right",
         preliminary::Bool = true, approved::Bool = false, final::Bool = false, production::Bool = true,
         kwargs...
     )
     if legend_logo
-        LegendMakie.add_legend_logo!(; position)
+        LegendMakie.add_legend_logo!(; position, show_date)
     elseif juleana_logo
-        LegendMakie.add_juleana_logo!(; position)
+        LegendMakie.add_juleana_logo!(; position, show_date)
     end
 
     if !final && preliminary
