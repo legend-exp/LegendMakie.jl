@@ -1,6 +1,6 @@
 name = "LegendMakie"
 uuid = "ce9a434a-d062-4f11-9371-3059ddb1c48a"
-version = "0.1.9"
+version = "0.1.10"
 
 [deps]
 
