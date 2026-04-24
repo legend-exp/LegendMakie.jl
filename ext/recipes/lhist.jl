@@ -4,7 +4,7 @@ function LegendMakie.lhist!(
     h::StatsBase.Histogram{<:Any, 2};
     watermark::Bool = true, rasterize::Bool = false, 
     position::String = "outer top", final::Bool = true,
-    colormap::Symbol = :magma, colorscale = Makie.log10, colorbarlabel = "",
+    colormap = :magma, colorscale = Makie.log10, colorbarlabel = "",
     title::AbstractString = "", titlesize = 18, titlegap = 2, titlealign = :right,
     xlabel = "", ylabel = "", xlims = extrema(first(h.edges)), ylims = extrema(last(h.edges)),
     xscale = Makie.identity, yscale = Makie.identity,
