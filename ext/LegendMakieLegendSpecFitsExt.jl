@@ -571,9 +571,10 @@ module LegendMakieLegendSpecFitsExt
         data = Makie.hist!(ax, StatsBase.midpoints(first(report.h.edges)), weights = report.h.weights, bins = first(report.h.edges), color = LegendMakie.DiamondGrey, fillto = 0.5*(ylims[1]))
         fit = Makie.lines!(range(extrema(first(report.h.edges))..., length = 1000), x -> Measurements.value(report.f_fit(x)) * step(first(report.h.edges)), color = :black)
         
+        data_plots = show_label ? [data, fit] : [data]
         data_labels = show_label ? ["Data", "Best Fit" * (!isempty(report.gof) ? " (p = $(round(report.gof.pvalue, digits=2)))" : "")] : ["Data"]
         if legend_position == :split
-            Makie.axislegend(ax, show_label ? [data, fit] : [data], data_labels, position = :lt)
+            Makie.axislegend(ax, data_plots, data_labels, position = :lt)
         end
 
         if show_components
@@ -593,10 +594,10 @@ module LegendMakieLegendSpecFitsExt
             if legend_position == :split
                 Makie.axislegend(ax, component_lines, component_labels, position = :rt)
             elseif legend_position != :none
-                Makie.axislegend(ax, [data, fit, component_lines...], [data_labels..., component_labels...], position = legend_position)
+                Makie.axislegend(ax, [data_plots..., component_lines...], [data_labels..., component_labels...], position = legend_position)
             end
         elseif legend_position != :none
-            Makie.axislegend(ax, show_label ? [data, fit] : [data], data_labels, position = legend_position)
+            Makie.axislegend(ax, data_plots, data_labels, position = legend_position)
         end
 
         if !isempty(report.gof) && show_residuals
