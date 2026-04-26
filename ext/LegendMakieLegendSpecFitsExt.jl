@@ -853,7 +853,8 @@ module LegendMakieLegendSpecFitsExt
         ax3 = Makie.Axis(g[2,2], limits = (0,nothing,0,1-1e-5), xlabel = "Counts / 0.1")
         Makie.plot!(ax3, StatsBase.fit(StatsBase.Histogram, report.qdrift_peak ./ maximum(report.qdrift_peak), 0:0.01:1), color = :darkgrey, label = "Before correction", direction = :x)
         ax3.xticks = Makie.WilkinsonTicks(3, k_min = 3, k_max=4)
-
+        ax3.xtickformat = x -> string.(round.(Int, x))
+        
         # Formatting
         Makie.linkxaxes!(ax,ax2)
         Makie.hidexdecorations!(ax)
