@@ -1077,7 +1077,10 @@ module LegendMakieLegendSpecFitsExt
 
     # plot report of sipm_simple_calibration
     function LegendMakie.lplot!(
-            report::NamedTuple{(:peakpos, :peakpos_cal, :h_uncal, :h_calsimple)};
+            report::Union{
+                NamedTuple{(:peakpos, :peakpos_cal, :h_uncal, :h_calsimple)},
+                NamedTuple{(:peakpos, :peakpos_cal, :h_uncal, :h_calsimple, :noise_threshold, :noise_threshold_cal, :valley_found)},
+            };
             cal::Bool = true, title::AbstractString = "", titlesize = 18, titlegap = 2,
             h = cal ? report.h_calsimple : report.h_uncal,
             label = "Amplitudes", peak_label = "Reconstructed\npeak positions",
