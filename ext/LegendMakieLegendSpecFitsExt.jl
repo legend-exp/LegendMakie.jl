@@ -1080,23 +1080,49 @@ module LegendMakieLegendSpecFitsExt
             report::Union{
                 NamedTuple{(:peakpos, :peakpos_cal, :h_uncal, :h_calsimple)},
                 NamedTuple{(:peakpos, :peakpos_cal, :h_uncal, :h_calsimple, :noise_threshold, :noise_threshold_cal, :valley_found)},
+                NamedTuple{(:peakpos, :peakpos_cal, :h_uncal, :h_calsimple, :h_uncal_full, :h_calsimple_full, :noise_threshold, :noise_threshold_cal, :valley_found)},
             };
             cal::Bool = true, title::AbstractString = "", titlesize = 18, titlegap = 2,
-            h = cal ? report.h_calsimple : report.h_uncal,
             label = "Amplitudes", peak_label = "Reconstructed\npeak positions",
-            xlims = (0, last(first(h.edges))), ylims = (0.99*minimum(filter(x -> x > 0, h.weights)), maximum(h.weights)*1.2),
-            yscale = Makie.log10, xlabel = "Peak Amplitudes ($(cal ? "P.E." : "ADC"))",
-            ylabel = "Counts / $(round_wo_units(step(first(h.edges)), digits = 2)) $(cal ? "P.E." : "ADC")",
-            xticks = cal ? (0:0.5:last(first(h.edges))) : Makie.WilkinsonTicks(6, k_min=5),
             legend_position = :rt, final::Bool = !isempty(title), watermark::Bool = true, kwargs...
         )
+
+        h_filt = cal ? report.h_calsimple : report.h_uncal
+        # Composite histogram: below the noise cut use the unfiltered all-trigger
+        # spectrum (shows the noise peak), above the cut use the single-trigger
+        # filtered spectrum. Falls back to `h_filt` when the report has no full
+        # spectrum (e.g. Vector-input call from filter optimization).
+        h = if hasproperty(report, :h_uncal_full) && hasproperty(report, :noise_threshold)
+            h_full = cal ? report.h_calsimple_full : report.h_uncal_full
+            cut = cal ? report.noise_threshold_cal : report.noise_threshold
+            edges = first(h_filt.edges)
+            cut_idx = something(findfirst(e -> e ≥ cut, edges), length(edges))
+            StatsBase.Histogram(edges, vcat(h_full.weights[1:cut_idx-1], h_filt.weights[cut_idx:end]))
+        else
+            h_filt
+        end
+
+        xlims = (0, last(first(h.edges)))
+        ylims = (0.99*minimum(filter(x -> x > 0, h.weights)), maximum(h.weights)*1.2)
+        yscale = Makie.log10
+        xlabel = "Peak Amplitudes ($(cal ? "P.E." : "ADC"))"
+        ylabel = "Counts / $(round_wo_units(step(first(h.edges)), digits = 2)) $(cal ? "P.E." : "ADC")"
+        xticks = cal ? (0:0.5:last(first(h.edges))) : Makie.WilkinsonTicks(6, k_min=5)
 
         # create histogram
         fig = LegendMakie.lplot!(h; limits = (xlims, ylims), title, titlesize, titlegap, xticks, xlabel, ylabel, yscale, label, legend_position = :none, kwargs...)
         ax = Makie.current_axis()
-    
+
         # add peak positions
         Makie.vlines!(ax, cal ? report.peakpos_cal : report.peakpos, color = :red, label = peak_label, linewidth = 1.5)
+
+        # add noise cut marker with its value in the legend
+        if hasproperty(report, :noise_threshold)
+            cut = cal ? report.noise_threshold_cal : report.noise_threshold
+            cut_label = "Noise cut: $(round(cut, digits = cal ? 3 : 1)) $(cal ? "P.E." : "ADC")"
+            Makie.vlines!(ax, [cut], color = :green, label = cut_label, linewidth = 1.5)
+        end
+
         legend_position != :none && Makie.axislegend(ax, framevisible = true, framewidth = 0, position = legend_position)
 
         # add watermarks
