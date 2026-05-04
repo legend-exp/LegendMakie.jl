@@ -790,8 +790,8 @@ module LegendMakieLegendSpecFitsExt
 
         # add inset
         ax_inset = Makie.Axis(fig[1,1],
-            width = Makie.Relative(0.4),
-            height = Makie.Relative(0.2),
+            width = Makie.Relative(0.35),
+            height = Makie.Relative(0.28),
             halign = 0.55,
             valign = 0.95, 
             yscale = Makie.log10,
@@ -803,7 +803,7 @@ module LegendMakieLegendSpecFitsExt
             xticklabelsize = 13,
             yticklabelsize = 13,
             yticks = (exp10.(0:10), "1" .* join.(fill.("0", 0:10))),
-            limits = (extrema(first(report.dep_h_before.edges)), (0.9, max(100, maximum(report.dep_h_before.weights)) * 1.2))
+            limits = (extrema(first(report.dep_h_before.edges)), (0.9*max(1, minimum(report.dep_h_after_ds.weights)), max(100, maximum(report.dep_h_before.weights)) * 1.2))
         )
         Makie.stephist!(ax_inset, StatsBase.midpoints(first(report.dep_h_before.edges)),    weights = replace(report.dep_h_before.weights, 0 => 1e-10),    bins = first(report.dep_h_before.edges),    color = (LegendMakie.AchatBlue, 0.5))
         Makie.stephist!(ax_inset, StatsBase.midpoints(first(report.dep_h_after_low.edges)), weights = replace(report.dep_h_after_low.weights, 0 => 1e-10), bins = first(report.dep_h_after_low.edges), color = (LegendMakie.BEGeOrange, 1))
