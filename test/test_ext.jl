@@ -21,6 +21,10 @@ using Test
     @test !isnothing(Base.get_extension(LegendMakie, :LegendMakieLegendSpecFitsExt))
 
     # load LegendDataManagement extension
-    import LegendDataManagement
+    import RadiationDetectorSignals
+    @test !isnothing(Base.get_extension(LegendMakie, :LegendMakieRadiationDetectorSignalsExt))
+
+    # load LegendDataManagement extension
+    import LegendDataManagement, LegendDataTypes
     @test !isnothing(Base.get_extension(LegendMakie, :LegendMakieLegendDataManagementExt))
 end
