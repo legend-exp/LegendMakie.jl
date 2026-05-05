@@ -22,7 +22,7 @@ YAML = "ddb6d928-2868-570f-bddf-ab3f9cf99eb6"
 
 [compat]
 Documenter = "1"
-LegendSpecFits = "0.4.4"
+LegendSpecFits = "0.4.6"
 LegendTestData = "0.3.4"
 Makie = "0.24"
 YAML = "0.4.6"
