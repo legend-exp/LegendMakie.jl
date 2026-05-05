@@ -78,7 +78,7 @@ end
                     :kwargs => PropDicts.PropDict(:relative_cut => 0.01, :n_bins => -1, :fixed_center => false, :left => true)
                 ))
             
-            result, report = LegendSpecFits.qc_window_cut(t, config, (:x1, :x2))
+            result, report = LegendSpecFits.qc_window_cut(t, config)
             @test_nowarn lplot(report, figsize = (600,900), title = "Test")
         end
 

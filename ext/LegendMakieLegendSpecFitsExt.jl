@@ -542,11 +542,16 @@ module LegendMakieLegendSpecFitsExt
     function LegendMakie.lplot!(
             report::NamedTuple{(:v, :h, :f_fit, :f_components, :gof)};
             xunit = u"keV", xlabel = "Energy ($xunit)", ylabel = "Counts / $(round(step(first(report.h.edges)), digits = 2)) $xunit",
-            title::AbstractString = "", titlesize = 18, legend_position = :lt,
-            xlims = extrema(first(report.h.edges)), 
-            ylims = let (_min, _max) = extrema(filter(x -> x > 0, report.h.weights))
-                scale = (_max/_min)^(1/4)
-                (_min / sqrt(scale), _max * scale)
+            title::AbstractString = "", titlesize = 18, legend_position = :split,
+            xlims = extrema(first(report.h.edges)),
+            yscale = Makie.log10,
+            ylims = if yscale == Makie.log10
+                let (_min, _max) = extrema(filter(x -> x > 0, report.h.weights))
+                    scale = (_max/_min)^(1/4)
+                    (_min / sqrt(scale), _max * scale)
+                end
+            else
+                (0, maximum(report.h.weights)*1.05)
             end,
             show_label::Bool = true, show_components::Bool = true, yticks = Makie.automatic,
             watermark::Bool = true, final::Bool = !isempty(title),
@@ -559,34 +564,40 @@ module LegendMakieLegendSpecFitsExt
         # create plot
         g = Makie.GridLayout(fig[row,col])
         ax = Makie.Axis(g[1,1], 
-            titlefont = :bold, limits = (xlims, ylims), yscale = Makie.log10;
-            title, xlabel, ylabel, yticks, titlesize
+            titlefont = :bold, limits = (xlims, ylims);
+            title, xlabel, ylabel, yticks, titlesize, yscale
         )
 
         data = Makie.hist!(ax, StatsBase.midpoints(first(report.h.edges)), weights = report.h.weights, bins = first(report.h.edges), color = LegendMakie.DiamondGrey, fillto = 0.5*(ylims[1]))
         fit = Makie.lines!(range(extrema(first(report.h.edges))..., length = 1000), x -> Measurements.value(report.f_fit(x)) * step(first(report.h.edges)), color = :black)
         
-        if legend_position != :none 
-            Makie.axislegend(ax, show_label ? [data, fit] : [data],
-                show_label ? ["Data", "Best Fit" * (!isempty(report.gof) ? " (p = $(round(report.gof.pvalue, digits=2)))" : "")] : ["Data"], 
-                position = :lt)
+        data_plots = show_label ? [data, fit] : [data]
+        data_labels = show_label ? ["Data", "Best Fit" * (!isempty(report.gof) ? " (p = $(round(report.gof.pvalue, digits=2)))" : "")] : ["Data"]
+        if legend_position == :split
+            Makie.axislegend(ax, data_plots, data_labels, position = :lt)
         end
 
         if show_components
+            component_labels, component_lines = [], []
             for (idx, component) in enumerate(keys(report.f_components.funcs))
-                Makie.lines!(
+                comp = Makie.lines!(
                     range(extrema(first(report.h.edges))..., length = 1000), 
                     x -> report.f_components.funcs[component](x) * step(first(report.h.edges)), 
                     color = report.f_components.colors[component], 
-                    label = ifelse(show_label, report.f_components.labels[component], nothing),
                     linestyle = report.f_components.linestyles[component],
                     linewidth = 4
                 )
+                push!(component_labels, ifelse(show_label, report.f_components.labels[component], nothing))
+                push!(component_lines, comp)
             end
     
-            if legend_position != :none 
-                Makie.axislegend(ax, position = :rt)
+            if legend_position == :split
+                Makie.axislegend(ax, component_lines, component_labels, position = :rt)
+            elseif legend_position != :none
+                Makie.axislegend(ax, [data_plots..., component_lines...], [data_labels..., component_labels...], position = legend_position)
             end
+        elseif legend_position != :none
+            Makie.axislegend(ax, data_plots, data_labels, position = legend_position)
         end
 
         if !isempty(report.gof) && show_residuals
@@ -779,8 +790,8 @@ module LegendMakieLegendSpecFitsExt
 
         # add inset
         ax_inset = Makie.Axis(fig[1,1],
-            width = Makie.Relative(0.4),
-            height = Makie.Relative(0.2),
+            width = Makie.Relative(0.35),
+            height = Makie.Relative(0.28),
             halign = 0.55,
             valign = 0.95, 
             yscale = Makie.log10,
@@ -792,7 +803,7 @@ module LegendMakieLegendSpecFitsExt
             xticklabelsize = 13,
             yticklabelsize = 13,
             yticks = (exp10.(0:10), "1" .* join.(fill.("0", 0:10))),
-            limits = (extrema(first(report.dep_h_before.edges)), (0.9, max(100, maximum(report.dep_h_before.weights)) * 1.2))
+            limits = (extrema(first(report.dep_h_before.edges)), (0.9*max(1, minimum(report.dep_h_after_ds.weights)), max(100, maximum(report.dep_h_before.weights)) * 1.2))
         )
         Makie.stephist!(ax_inset, StatsBase.midpoints(first(report.dep_h_before.edges)),    weights = replace(report.dep_h_before.weights, 0 => 1e-10),    bins = first(report.dep_h_before.edges),    color = (LegendMakie.AchatBlue, 0.5))
         Makie.stephist!(ax_inset, StatsBase.midpoints(first(report.dep_h_after_low.edges)), weights = replace(report.dep_h_after_low.weights, 0 => 1e-10), bins = first(report.dep_h_after_low.edges), color = (LegendMakie.BEGeOrange, 1))
@@ -843,7 +854,8 @@ module LegendMakieLegendSpecFitsExt
         ax3 = Makie.Axis(g[2,2], limits = (0,nothing,0,1-1e-5), xlabel = "Counts / 0.1")
         Makie.plot!(ax3, StatsBase.fit(StatsBase.Histogram, report.qdrift_peak ./ maximum(report.qdrift_peak), 0:0.01:1), color = :darkgrey, label = "Before correction", direction = :x)
         ax3.xticks = Makie.WilkinsonTicks(3, k_min = 3, k_max=4)
-
+        ax3.xtickformat = x -> string.(round.(Int, x))
+        
         # Formatting
         Makie.linkxaxes!(ax,ax2)
         Makie.hidexdecorations!(ax)

@@ -5,7 +5,6 @@ module LegendMakieLegendDataManagementExt
     import LegendMakie
     import LegendDataManagement
 
-    import ArraysOfArrays: flatview
     import Dates
     import Format
     import LegendDataTypes: decode_data
@@ -227,7 +226,7 @@ module LegendMakieLegendDataManagementExt
                     t = Unitful.ustrip.(xunit, first(system_wvfs).time)
                     e_minmax = maximum.(system_wvfs.signal) .- minimum.(system_wvfs.signal)
                     e_minmax_colors = Makie.resample_cmap(:coolwarm, round(Int, maximum(e_minmax)))
-                    Makie.series!(ax, collect(t), reshape(flatview(system_wvfs.signal), length(first(system_wvfs).signal), :)', solid_color=e_minmax_colors[e_minmax])
+                    Makie.series!(ax, collect(t), stack(system_wvfs.signal)', solid_color=e_minmax_colors[e_minmax])
                 end
                 ax
             end for (s,sys) in enumerate(sort(collect(keys(system))))]

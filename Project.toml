@@ -5,7 +5,6 @@ version = "0.1.11"
 [deps]
 
 [weakdeps]
-ArraysOfArrays = "65a8f2f4-9b39-5baf-92e2-a9cc46fdf018"
 Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
 FileIO = "5789e2e9-d7fb-5bc7-8068-2c6fae9b9549"
 Format = "1fa38f19-a742-5d3f-a2b9-30dd87b9d5f8"
@@ -23,13 +22,12 @@ TypedTables = "9d95f2ec-7b3d-5a63-8d20-e2491e220bb9"
 Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
 
 [extensions]
-LegendMakieLegendDataManagementExt = ["Makie", "LegendDataManagement", "ArraysOfArrays", "Dates", "Format", "LegendDataTypes", "Measurements", "PropDicts", "TypedTables", "Unitful", "RadiationDetectorSignals"]
+LegendMakieLegendDataManagementExt = ["Makie", "LegendDataManagement", "Dates", "Format", "LegendDataTypes", "Measurements", "PropDicts", "TypedTables", "Unitful", "RadiationDetectorSignals"]
 LegendMakieLegendSpecFitsExt = ["Makie", "KernelDensity", "LaTeXStrings", "Measurements", "StatsBase", "Unitful"]
 LegendMakieMakieExt = ["Makie", "Dates", "FileIO", "Format", "MathTeXEngine", "StatsBase"]
 LegendMakieRadiationDetectorSignalsExt = ["Makie", "RadiationDetectorSignals"]
 
 [compat]
-ArraysOfArrays = "0.6"
 Dates = "1"
 FileIO = "1"
 Format = "1"
