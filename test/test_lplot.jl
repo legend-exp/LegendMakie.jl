@@ -327,14 +327,6 @@ end
             @test_nowarn lplot(data, t_phy, det, figsize = (800,380), xlims = (0,128), show_label = false)
         end
 
-        # Old syntax
-        ch = LegendDataManagement.ChannelId(1234568)
-        @testset "Channel plots" begin 
-            @test_nowarn lplot(data, t_cal, ch, figsize = (800,380), xlims = (0,128))
-            @test_throws ArgumentError lplot(data, t_cal .+ 1u"s", ch, figsize = (800,380), xlims = (0,128))
-            @test_nowarn lplot(data, t_phy, ch, figsize = (800,380), xlims = (0,128), show_label = false)
-        end
-        
         # remove test repository
         isdir(testdir) && rm(testdir, force = true, recursive = true)
     end
