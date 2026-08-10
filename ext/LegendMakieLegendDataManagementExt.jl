@@ -118,12 +118,11 @@ module LegendMakieLegendDataManagementExt
 
 
     function LegendMakie.lplot!(
-            data::LegendDataManagement.LegendData, fk::LegendDataManagement.FileKey, ts::Unitful.Time{<:Real}, ch::Union{<:LegendDataManagement.ChannelIdLike, <:LegendDataManagement.DetectorIdLike}; 
+            data::LegendDataManagement.LegendData, fk::LegendDataManagement.FileKey, ts::Unitful.Time{<:Real}, det::LegendDataManagement.DetectorIdLike; 
             plot_tier = LegendDataManagement.DataTier(:raw), plot_waveform = [:waveform_presummed], show_unixtime = false, xunit::Unitful.Units = u"µs", 
             xlims = nothing, show_title::Bool = true, show_label::Bool = true, watermark::Bool = true, final::Bool = true
         )
-
-        det = Base.get_extension(LegendDataManagement, :LegendDataManagementLegendHDF5IOExt)._get_detectorid(data, fk, ch)
+        det = LegendDataManagement.DetectorId(det)  # convert to DetectorId if necessary
         
         raw = LegendDataManagement.read_ldata(data, plot_tier, fk, det)
         idx = findfirst(isequal(ts), raw.timestamp)
@@ -245,9 +244,9 @@ module LegendMakieLegendDataManagementExt
     end
 
 
-    function LegendMakie.lplot!(data::LegendDataManagement.LegendData, ts::Unitful.Time{<:Real}, ch::Union{<:LegendDataManagement.ChannelIdLike, <:LegendDataManagement.DetectorIdLike}; kwargs...)
+    function LegendMakie.lplot!(data::LegendDataManagement.LegendData, ts::Unitful.Time{<:Real}, det::LegendDataManagement.DetectorIdLike; kwargs...)
         fk = LegendDataManagement.find_filekey(data, ts)
-        det = Base.get_extension(LegendDataManagement, :LegendDataManagementLegendHDF5IOExt)._get_detectorid(data, fk, ch)
+        det = LegendDataManagement.DetectorId(det)  # convert to DetectorId if necessary
         LegendMakie.lplot!(data, fk, ts, det; kwargs...)
     end
 
