@@ -35,6 +35,21 @@ using Test
             rm(fn)
         end
     end
+    @testset "cleanup after saving" begin
+        # saving empties the figure by default (breaks the global-theme references that
+        # otherwise keep every saved figure alive); cleanup = false keeps it intact
+        fig = Makie.Figure()
+        Makie.Axis(fig[1, 1]); Makie.Label(fig[2, 1], "keep")
+        @test length(fig.content) == 2
+        lsavefig(fig, "cleanup.png")
+        @test isempty(fig.content)
+        rm("cleanup.png")
+        fig2 = Makie.Figure()
+        Makie.Axis(fig2[1, 1])
+        lsavefig(fig2, "nocleanup.png"; cleanup = false)
+        @test length(fig2.content) == 1
+        rm("nocleanup.png")
+    end
 end
 
 @testset "lplot" begin

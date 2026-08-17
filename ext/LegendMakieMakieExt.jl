@@ -58,7 +58,11 @@ module LegendMakieMakieExt
         LegendMakie.lsavefig(fig, name; kwargs...)
     end
 
-    function LegendMakie.lsavefig(fig::Makie.Figure, name::AbstractString; kwargs...)
-        FileIO.save(name, fig; kwargs...)
+    # Makie keeps every figure reachable through listeners on the global theme, so a long
+    # session leaks ~90 MB per saved figure; empty!(fig) after saving disconnects them.
+    function LegendMakie.lsavefig(fig::Makie.Figure, name::AbstractString; cleanup::Bool = true, kwargs...)
+        ret = FileIO.save(name, fig; kwargs...)
+        cleanup && Base.empty!(fig)
+        return ret
     end
 end
