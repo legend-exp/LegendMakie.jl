@@ -1075,11 +1075,20 @@ module LegendMakieLegendSpecFitsExt
     end
 
 
-    # plot report of sipm_simple_calibration
+    # composite spectrum: all-trigger below the noise cut (shows the noise peak), single-trigger above
+    function _sipm_composite_hist(report, cal::Bool)
+        h_filt, h_full, cut = cal ? (report.h_calsimple, report.h_calsimple_full, report.noise_threshold_cal) :
+                                    (report.h_uncal, report.h_uncal_full, report.noise_threshold)
+        edges = first(h_filt.edges)
+        cut_idx = something(findfirst(>=(cut), edges), length(edges))
+        StatsBase.Histogram(edges, vcat(h_full.weights[1:cut_idx-1], h_filt.weights[cut_idx:end]))
+    end
+
+    # plot report of sipm_simple_calibration (needs the extended report of LegendSpecFits > 0.4.6)
     function LegendMakie.lplot!(
-            report::NamedTuple{(:peakpos, :peakpos_cal, :h_uncal, :h_calsimple)};
+            report::NamedTuple{(:peakpos, :peakpos_cal, :h_uncal, :h_calsimple, :h_uncal_full, :h_calsimple_full, :noise_threshold, :noise_threshold_cal, :valley_found)};
             cal::Bool = true, title::AbstractString = "", titlesize = 18, titlegap = 2,
-            h = cal ? report.h_calsimple : report.h_uncal,
+            h = _sipm_composite_hist(report, cal),
             label = "Amplitudes", peak_label = "Reconstructed\npeak positions",
             xlims = (0, last(first(h.edges))), ylims = (0.99*minimum(filter(x -> x > 0, h.weights)), maximum(h.weights)*1.2),
             yscale = Makie.log10, xlabel = "Peak Amplitudes ($(cal ? "P.E." : "ADC"))",
@@ -1092,8 +1101,11 @@ module LegendMakieLegendSpecFitsExt
         fig = LegendMakie.lplot!(h; limits = (xlims, ylims), title, titlesize, titlegap, xticks, xlabel, ylabel, yscale, label, legend_position = :none, kwargs...)
         ax = Makie.current_axis()
     
-        # add peak positions
+        # add peak positions and the noise cut with its value in the legend
         Makie.vlines!(ax, cal ? report.peakpos_cal : report.peakpos, color = :red, label = peak_label, linewidth = 1.5)
+        cut = cal ? report.noise_threshold_cal : report.noise_threshold
+        Makie.vlines!(ax, [cut], color = :green, linewidth = 1.5,
+            label = "Noise cut: $(round(cut, digits = cal ? 3 : 1)) $(cal ? "P.E." : "ADC")")
         legend_position != :none && Makie.axislegend(ax, framevisible = true, framewidth = 0, position = legend_position)
 
         # add watermarks
