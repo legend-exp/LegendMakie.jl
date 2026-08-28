@@ -56,6 +56,39 @@ end
         @test_throws ArgumentError LegendMakie.add_watermarks!(position = "Test")
     end
 
+    @testset "Stability plots" begin
+        @testset "Time-series heatmap" begin
+            time = collect(0.0:9.0)
+            values = [0.1, 0.2, NaN, 0.4, 0.5, Inf, 0.7, 0.8, 0.9, 1.0]
+
+            report = TimeSeriesHeatmapReport(time, values; ylabel = "Baseline (ADC)", title = "Baseline stability", nbins = 10)
+            @test_nowarn lplot(report)
+
+            report_with_limits = TimeSeriesHeatmapReport(time, values; ylabel = "Baseline σ (ADC)", title = "Baseline σ stability", ylims = (0.0, 1.2), nbins = 10)
+            @test_nowarn lplot(report_with_limits)
+
+            invalid_report = TimeSeriesHeatmapReport([NaN, Inf], [NaN, Inf]; ylabel = "E_cusp (ADC)", title = "Invalid stability data", nbins = 10)
+            @test_throws ArgumentError lplot(invalid_report)
+        end
+
+        @testset "Energy histogram" begin
+            report = EnergyHistReport([100.0, 150.0, 900.0, 1_100.0, NaN, Inf]; xlabel = "E_cusp (ADC)", title = "E_cusp distribution", binning = 0.0:250.0:1_500.0)
+            @test_nowarn lplot(report)
+        end
+
+        @testset "Gain stability" begin
+            time = collect(0.0:10.0:90.0)
+            e_pulser = 1_000.0 .+ range(0.0, 0.9, length = length(time))
+            e_cusp = 2_000.0 .+ range(0.0, 1.2, length = length(time))
+            report = GainStabilityReport(time, e_cusp, e_pulser; Qbb = 2_039.0, n_ref = 4, n_smooth = 3, title = "Pulser gain stability")
+            @test_nowarn lplot(report)
+
+            # n_ref may exceed the number of samples and is truncated internally.
+            short_report = GainStabilityReport(time[1:3], e_cusp[1:3], e_pulser[1:3]; n_ref = 500, n_smooth = 3, title = "Short pulser gain stability")
+            @test_nowarn lplot(short_report)
+        end
+    end
+
     @testset "Test LegendSpecFits reports" begin
         @testset "Singlefits" begin
             result, report = LegendSpecFits.fit_single_trunc_gauss(randn(10000), (low = -4.0, high = 4.0, max = NaN))
