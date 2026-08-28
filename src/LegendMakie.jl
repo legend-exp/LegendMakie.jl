@@ -10,6 +10,7 @@ module LegendMakie
     include("utils.jl")
     include("lplot.jl")
     include("register_extdeps.jl")
+    include("plotting_structs.jl")
 
     function __init__()
         _register_extension_deps(
@@ -21,4 +22,5 @@ module LegendMakie
         )
     end
 
+    export TimeSeriesHeatmapReport, EnergyHistReport, GainStabilityReport
 end # module
