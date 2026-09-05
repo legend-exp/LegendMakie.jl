@@ -17,8 +17,9 @@ module LegendMakie
             lplot! => :Makie,
             lhist => :Makie,
             lhist! => :Makie,
+            lgainstability => :Makie,
+            lgainstability! => :Makie,
             lsavefig => :Makie
         )
     end
-
 end # module
