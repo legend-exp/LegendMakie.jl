@@ -20,4 +20,5 @@ module LegendMakie
             lsavefig => :Makie
         )
     end
+
 end # module
