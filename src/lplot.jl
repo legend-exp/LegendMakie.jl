@@ -36,16 +36,6 @@ function lhist! end
 export lhist, lhist!
 
 """
-    lgainstability(time, energy, pulser_energy; kwargs...)
-    lgainstability!(time, energy, pulser_energy; kwargs...)
-
-Plot the rolling gain variation of an energy estimator and a pulser reference.
-"""
-function lgainstability end
-function lgainstability! end
-export lgainstability, lgainstability!
-
-"""
     lsavefig(filename)
 
 Saves the current figure to a file with a given `filename`.

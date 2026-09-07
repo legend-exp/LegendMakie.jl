@@ -72,17 +72,6 @@ end
             @test_nowarn lhist(energy; xlabel = "E_cusp (ADC)", title = "E_cusp distribution", bins = 0.0:250.0:1_500.0, yscale = Makie.log10)
             @test_throws ArgumentError lhist([NaN, Inf])
         end
-
-        @testset "Gain stability" begin
-            time = collect(0.0:10.0:90.0)
-            e_pulser = 1_000.0 .+ range(0.0, 0.9, length = length(time))
-            e_cusp = 2_000.0 .+ range(0.0, 1.2, length = length(time))
-            @test_nowarn lgainstability(time, e_cusp, e_pulser; Qbb = 2_039.0, n_ref = 4, n_smooth = 3, title = "Pulser gain stability")
-
-            # n_ref may exceed the number of samples and is truncated internally.
-            @test_nowarn lgainstability(time[1:3], e_cusp[1:3], e_pulser[1:3]; n_ref = 500, n_smooth = 3, title = "Short pulser gain stability")
-            @test_throws DimensionMismatch lgainstability(time[1:2], e_cusp, e_pulser)
-        end
     end
 
     @testset "Test LegendSpecFits reports" begin
