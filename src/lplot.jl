@@ -22,16 +22,18 @@ export lplot, lplot!
 
 
 """
-    lplot(objs...)
-    lplot!(objs...)
+    lhist(values; bins = 100, kwargs...)
+    lhist(x, y; bins = 100, kwargs...)
+    lhist(histogram; kwargs...)
+    lhist!(args...; kwargs...)
 
-Plots `objs` via Makie in a LEGEND-specific form/style into a new histogram.
+Plot a one- or two-dimensional histogram with the LEGEND style. `bins` may be a
+bin count, explicit edges, or a pair of either for a two-dimensional histogram.
 
 """
 function lhist end
 function lhist! end
 export lhist, lhist!
-
 
 """
     lsavefig(filename)

@@ -1,6 +1,31 @@
 # This file is a part of LegendMakie.jl, licensed under the MIT License (MIT).
 
 function LegendMakie.lhist!(
+    values::AbstractVector{<:Real};
+    bins = 100, kwargs...
+)
+    h = if bins isa Integer
+        StatsBase.fit(StatsBase.Histogram, values; nbins = bins)
+    else
+        StatsBase.fit(StatsBase.Histogram, values, bins)
+    end
+    LegendMakie.lhist!(h; kwargs...)
+end
+
+function LegendMakie.lhist!(
+    x::AbstractVector{<:Real}, y::AbstractVector{<:Real};
+    bins = 100, kwargs...
+)
+    data = (x, y)
+    h = if bins isa Integer || bins isa Tuple{Integer, Integer}
+        StatsBase.fit(StatsBase.Histogram, data; nbins = bins)
+    else
+        StatsBase.fit(StatsBase.Histogram, data, bins)
+    end
+    LegendMakie.lhist!(h; kwargs...)
+end
+
+function LegendMakie.lhist!(
     h::StatsBase.Histogram{<:Any, 2};
     watermark::Bool = true, rasterize::Bool = false, 
     position::String = "outer top", final::Bool = true,
