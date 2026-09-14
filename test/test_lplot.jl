@@ -70,6 +70,7 @@ end
         @testset "Energy histogram" begin
             energy = [100.0, 150.0, 900.0, 1_100.0, NaN, Inf]
             @test_nowarn lhist(energy; xlabel = "E_cusp (ADC)", title = "E_cusp distribution", bins = 0.0:250.0:1_500.0, yscale = Makie.log10)
+            @test_nowarn lhist(energy; xlabel = "E_cusp (ADC)", title = "E_cusp distribution", bins = 10.0 .^ range(1, 4, length=31), xscale = Makie.log10, yscale = Makie.log10)
             @test_throws ArgumentError lhist([NaN, Inf])
         end
     end
