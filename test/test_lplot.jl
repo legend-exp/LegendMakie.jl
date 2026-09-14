@@ -308,15 +308,15 @@ end
         ENV["LEGEND_DATA_CONFIG"] = joinpath(testdir, "test_config.json");
         data = LegendDataManagement.LegendData(:l200)
         
-        # create fake data
-        for fk in [LegendDataManagement.runinfo(data).phy.startkey; LegendDataManagement.runinfo(data).cal.startkey]
-            _, period, run, cat, time = split(string(fk), "-")
-            !isdir(joinpath(testdir, cat)) && mkdir(joinpath(testdir, cat))
-            !isdir(joinpath(testdir, cat, period)) && mkdir(joinpath(testdir, cat, period))
-            !isdir(joinpath(testdir, cat, period, run)) && mkdir(joinpath(testdir, cat, period, run))
+        # create fake data for the two runs used below
+        fk_cal = LegendDataManagement.start_filekey(data, :p02, :r006, :cal)
+        fk_phy = LegendDataManagement.start_filekey(data, :p02, :r006, :phy)
+        for fk in (fk_cal, fk_phy)
+            raw_path = data.tier[:raw, fk]
+            mkpath(dirname(raw_path))
             #create fake files
             chinfo = LegendDataManagement.channelinfo(data, fk, system = :geds)
-            LegendHDF5IO.lh5open(joinpath(testdir, cat, period, run, "$(fk)-tier_raw.lh5"), "w") do h
+            LegendHDF5IO.lh5open(raw_path, "w") do h
                 for det in chinfo.detector
                     h["$(det)/raw"] = TypedTables.Table(
                         timestamp = [Dates.datetime2unix(Dates.DateTime(fk))u"s" + 100u"s"],
@@ -328,8 +328,8 @@ end
         end
 
         # plot the event
-        t_cal = 1.6566337e9u"s"
-        t_phy = 1.6567201e9u"s"
+        t_cal = Dates.datetime2unix(Dates.DateTime(fk_cal))u"s" + 100u"s"
+        t_phy = Dates.datetime2unix(Dates.DateTime(fk_phy))u"s" + 100u"s"
 
         @testset "Event plots" begin 
             @test_nowarn lplot(data, t_cal, figsize = (800,600), xlims = (0,128))
