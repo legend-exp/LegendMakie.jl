@@ -318,7 +318,7 @@ end
             chinfo = LegendDataManagement.channelinfo(data, fk, system = :geds)
             LegendHDF5IO.lh5open(raw_path, "w") do h
                 for det in chinfo.detector
-                    h["$(det)/raw"] = TypedTables.Table(
+                    h["raw/$(det)"] = TypedTables.Table(
                         timestamp = [Dates.datetime2unix(Dates.DateTime(fk))u"s" + 100u"s"],
                         waveform_presummed = [RadiationDetectorSignals.RDWaveform(range(0u"μs", 128u"μs", length = 1000), rand(UInt8, 1000))],
                         waveform_windowed = [RadiationDetectorSignals.RDWaveform(range(0u"μs", 128u"μs", length = 1000), rand(UInt8, 1000))],
