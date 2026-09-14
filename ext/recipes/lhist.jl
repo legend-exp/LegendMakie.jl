@@ -1,28 +1,15 @@
 # This file is a part of LegendMakie.jl, licensed under the MIT License (MIT).
 
-function LegendMakie.lhist!(
-    values::AbstractVector{<:Real};
-    bins = 100, kwargs...
-)
-    h = if bins isa Integer
-        StatsBase.fit(StatsBase.Histogram, values; nbins = bins)
-    else
-        StatsBase.fit(StatsBase.Histogram, values, bins)
-    end
-    LegendMakie.lhist!(h; kwargs...)
+# `bins` is either a bin count per dimension or explicit bin edges
+_histogram(data, nbins::Union{Integer, Tuple{Vararg{Integer}}}) = StatsBase.fit(StatsBase.Histogram, data; nbins)
+_histogram(data, edges) = StatsBase.fit(StatsBase.Histogram, data, edges)
+
+function LegendMakie.lhist!(values::AbstractVector{<:Real}; bins = 100, kwargs...)
+    LegendMakie.lhist!(_histogram(values, bins); kwargs...)
 end
 
-function LegendMakie.lhist!(
-    x::AbstractVector{<:Real}, y::AbstractVector{<:Real};
-    bins = 100, kwargs...
-)
-    data = (x, y)
-    h = if bins isa Integer || bins isa Tuple{Integer, Integer}
-        StatsBase.fit(StatsBase.Histogram, data; nbins = bins)
-    else
-        StatsBase.fit(StatsBase.Histogram, data, bins)
-    end
-    LegendMakie.lhist!(h; kwargs...)
+function LegendMakie.lhist!(x::AbstractVector{<:Real}, y::AbstractVector{<:Real}; bins = 100, kwargs...)
+    LegendMakie.lhist!(_histogram((x, y), bins); kwargs...)
 end
 
 function LegendMakie.lhist!(
