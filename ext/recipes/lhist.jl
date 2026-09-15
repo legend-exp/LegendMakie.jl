@@ -1,5 +1,17 @@
 # This file is a part of LegendMakie.jl, licensed under the MIT License (MIT).
 
+# `bins` is either a bin count per dimension or explicit bin edges
+_histogram(data, nbins::Union{Integer, Tuple{Vararg{Integer}}}) = StatsBase.fit(StatsBase.Histogram, data; nbins)
+_histogram(data, edges) = StatsBase.fit(StatsBase.Histogram, data, edges)
+
+function LegendMakie.lhist!(values::AbstractVector{<:Real}; bins = 100, kwargs...)
+    LegendMakie.lhist!(_histogram(values, bins); kwargs...)
+end
+
+function LegendMakie.lhist!(x::AbstractVector{<:Real}, y::AbstractVector{<:Real}; bins = 100, kwargs...)
+    LegendMakie.lhist!(_histogram((x, y), bins); kwargs...)
+end
+
 function LegendMakie.lhist!(
     h::StatsBase.Histogram{<:Any, 2};
     watermark::Bool = true, rasterize::Bool = false, 
@@ -44,7 +56,8 @@ function LegendMakie.lhist!(
         h::StatsBase.Histogram{<:Any, 1}; 
         title::AbstractString = "", titlesize = 18, titlegap = 2,
         xlabel = "", ylabel = "", label = nothing, yscale = Makie.identity,
-        xlims = extrema(first(h.edges)), xticks = Makie.WilkinsonTicks(6,k_min=5), 
+        xlims = extrema(first(h.edges)), xscale = Makie.identity,
+        xticks = xscale == Makie.log10 ? Makie.LogTicks(Makie.WilkinsonTicks(5, k_min = 3)) : Makie.WilkinsonTicks(6,k_min=5),
         yticks = yscale == Makie.log10 ? Makie.LogTicks(Makie.WilkinsonTicks(5, k_min = 3)) : Makie.WilkinsonTicks(6, k_min=4), 
         ylims = (yscale == Makie.log10 ? 0.9 : 0, maximum(h.weights)*1.2),
         fill::Bool = false, color = LegendMakie.AchatBlue, linewidth = 2, legend_position = :rt,
@@ -57,7 +70,7 @@ function LegendMakie.lhist!(
     ax = if isnothing(Makie.current_axis())
         Makie.Axis(fig[1,1],
             limits = (xlims, ylims);
-            title, titlesize, titlegap, xlabel, ylabel, xticks, yticks, yscale
+            title, titlesize, titlegap, xlabel, ylabel, xticks, yticks, xscale, yscale
         )
     else
         Makie.current_axis()

@@ -71,6 +71,23 @@ end
         @test_throws ArgumentError LegendMakie.add_watermarks!(position = "Test")
     end
 
+    @testset "Stability plots" begin
+        @testset "Time-series heatmap" begin
+            time = collect(0.0:9.0)
+            values = collect(0.1:0.1:1.0)
+
+            @test_nowarn lhist(time, values; bins = 10, ylabel = "Baseline (ADC)", title = "Baseline stability")
+            @test_nowarn lhist(time, values; bins = (10, 20), ylabel = "Baseline σ (ADC)", title = "Baseline σ stability", ylims = (0.0, 1.2))
+            @test_throws DimensionMismatch lhist([1.0], [1.0, 2.0])
+        end
+
+        @testset "Energy histogram" begin
+            energy = [100.0, 150.0, 900.0, 1_100.0]
+            @test_nowarn lhist(energy; xlabel = "E_cusp (ADC)", title = "E_cusp distribution", bins = 0.0:250.0:1_500.0, yscale = Makie.log10)
+            @test_nowarn lhist(energy; xlabel = "E_cusp (ADC)", title = "E_cusp distribution", bins = 10.0 .^ range(1, 4, length=31), xscale = Makie.log10, yscale = Makie.log10)
+        end
+    end
+
     @testset "Test LegendSpecFits reports" begin
         @testset "Singlefits" begin
             result, report = LegendSpecFits.fit_single_trunc_gauss(randn(10000), (low = -4.0, high = 4.0, max = NaN))
@@ -306,17 +323,17 @@ end
         ENV["LEGEND_DATA_CONFIG"] = joinpath(testdir, "test_config.json");
         data = LegendDataManagement.LegendData(:l200)
         
-        # create fake data
-        for fk in [LegendDataManagement.runinfo(data).phy.startkey; LegendDataManagement.runinfo(data).cal.startkey]
-            _, period, run, cat, time = split(string(fk), "-")
-            !isdir(joinpath(testdir, cat)) && mkdir(joinpath(testdir, cat))
-            !isdir(joinpath(testdir, cat, period)) && mkdir(joinpath(testdir, cat, period))
-            !isdir(joinpath(testdir, cat, period, run)) && mkdir(joinpath(testdir, cat, period, run))
+        # create fake data for the two runs used below
+        fk_cal = LegendDataManagement.start_filekey(data, :p02, :r006, :cal)
+        fk_phy = LegendDataManagement.start_filekey(data, :p02, :r006, :phy)
+        for fk in (fk_cal, fk_phy)
+            raw_path = data.tier[:raw, fk]
+            mkpath(dirname(raw_path))
             #create fake files
             chinfo = LegendDataManagement.channelinfo(data, fk, system = :geds)
-            LegendHDF5IO.lh5open(joinpath(testdir, cat, period, run, "$(fk)-tier_raw.lh5"), "w") do h
+            LegendHDF5IO.lh5open(raw_path, "w") do h
                 for det in chinfo.detector
-                    h["$(det)/raw"] = TypedTables.Table(
+                    h["raw/$(det)"] = TypedTables.Table(
                         timestamp = [Dates.datetime2unix(Dates.DateTime(fk))u"s" + 100u"s"],
                         waveform_presummed = [RadiationDetectorSignals.RDWaveform(range(0u"μs", 128u"μs", length = 1000), rand(UInt8, 1000))],
                         waveform_windowed = [RadiationDetectorSignals.RDWaveform(range(0u"μs", 128u"μs", length = 1000), rand(UInt8, 1000))],
@@ -326,8 +343,8 @@ end
         end
 
         # plot the event
-        t_cal = 1.6566337e9u"s"
-        t_phy = 1.6567201e9u"s"
+        t_cal = Dates.datetime2unix(Dates.DateTime(fk_cal))u"s" + 100u"s"
+        t_phy = Dates.datetime2unix(Dates.DateTime(fk_phy))u"s" + 100u"s"
 
         @testset "Event plots" begin 
             @test_nowarn lplot(data, t_cal, figsize = (800,600), xlims = (0,128))
