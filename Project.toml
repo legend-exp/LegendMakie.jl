@@ -2,8 +2,6 @@ name = "LegendMakie"
 uuid = "ce9a434a-d062-4f11-9371-3059ddb1c48a"
 version = "0.2.1"
 
-[deps]
-
 [weakdeps]
 Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
 FileIO = "5789e2e9-d7fb-5bc7-8068-2c6fae9b9549"
@@ -33,7 +31,7 @@ FileIO = "1"
 Format = "1"
 KernelDensity = "0.6"
 LaTeXStrings = "1.2"
-LegendDataManagement = "0.6"
+LegendDataManagement = "0.6.13"
 LegendDataTypes = "0.1"
 Makie = "0.24.4"
 MathTeXEngine = "0.6.1"
