@@ -22,6 +22,6 @@ YAML = "ddb6d928-2868-570f-bddf-ab3f9cf99eb6"
 
 [compat]
 Documenter = "1"
-LegendDataManagement = "0.6.13"
-LegendSpecFits = "0.4.6"
+LegendDataManagement = "0.6.14"
+LegendSpecFits = "0.4.10"
 LegendTestData = "0.3.4"
