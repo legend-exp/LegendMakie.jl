@@ -20,10 +20,12 @@ lplot(report, xlabel = "x", title = "Truncated Gaussian fit")
 # ## Window cuts
 #
 # A centered window cut keeps the values within a number of standard deviations of a
-# Gaussian fit; the cut is drawn on the histogram.
+# half Gaussian fit to one side of a distribution centered at a known value, zero by
+# default; the cut is drawn on the histogram.
 
-result, report = get_centered_gaussian_window_cut(x, 0.0, 4.0, 3.0, n_bins = -1)
-lplot(report, xlabel = "x", title = "Window cut")
+slope = 0.5 .* randn(10_000)
+result, report = get_centered_gaussian_window_cut(slope, -4.0, 4.0, 3.0, n_bins = -1)
+lplot(report, xlabel = "Baseline slope", title = "Window cut")
 
 # The quality cuts of several parameters of a table are fit at once; the report holds one
 # panel per parameter.
