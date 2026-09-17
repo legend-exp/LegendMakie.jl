@@ -21,12 +21,14 @@ function fix_literate_output(content)
     return content
 end
 
-gen_content_dir = joinpath(@__DIR__, "src", "tutorials")
-for tut_lit_fn in filter(fn -> endswith(fn, "_lit.jl"), readdir(gen_content_dir))
-    lit_src_fn = joinpath(gen_content_dir, tut_lit_fn)
-    tut_basename = tut_lit_fn[1:end-7] # remove "_lit.jl"
-    Literate.notebook(lit_src_fn, gen_content_dir, name = tut_basename, documenter = true, credit = true, execute = false)
-    Literate.markdown(lit_src_fn, gen_content_dir, name = tut_basename, documenter = true, credit = true, postprocess = fix_literate_output)
+# Every `*_lit.jl` in these directories becomes a page whose code runs at build time, and a notebook
+for gen_content_dir in joinpath.(@__DIR__, "src", ("tutorials", "recipes"))
+    for tut_lit_fn in filter(fn -> endswith(fn, "_lit.jl"), readdir(gen_content_dir))
+        lit_src_fn = joinpath(gen_content_dir, tut_lit_fn)
+        tut_basename = tut_lit_fn[1:end-7] # remove "_lit.jl"
+        Literate.notebook(lit_src_fn, gen_content_dir, name = tut_basename, documenter = true, credit = true, execute = false)
+        Literate.markdown(lit_src_fn, gen_content_dir, name = tut_basename, documenter = true, credit = true, postprocess = fix_literate_output)
+    end
 end
 
 makedocs(
@@ -41,6 +43,16 @@ makedocs(
         "Home" => "index.md",
         "Tutorials" => [
             "tutorials/basic_tutorial.md",
+        ],
+        "Recipes" => [
+            "Histograms" => "recipes/histograms.md",
+            "Waveforms and events" => "recipes/waveforms.md",
+            "Parameters per detector" => "recipes/parameters.md",
+            "Fits, cuts and filter optimization" => "recipes/fits.md",
+            "Energy calibration" => "recipes/energy_calibration.md",
+            "A/E" => "recipes/aoe.md",
+            "LQ" => "recipes/lq.md",
+            "SiPM calibration" => "recipes/sipm.md",
         ],
         "API" => "api.md",
         "LICENSE" => "LICENSE.md",
