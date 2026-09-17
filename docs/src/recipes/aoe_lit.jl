@@ -84,7 +84,7 @@ lplot(report_cut, figsize = (750, 400), title = "Low A/E cut")
 
 aoe_sf = vcat(randn(30_000), randn(70_000) .- 10)
 e_sf = 1.5u"keV" .* randn(100_000) .+ 2614.5u"keV"
-result_sf, report_sf = get_peaks_survival_fractions(aoe_sf, e_sf, [2614.5u"keV"], [:Tl208FEP], [(35.0u"keV", 35.0u"keV")], -5.0)
+result_sf, report_sf = get_peaks_survival_fractions(aoe_sf, e_sf, [2614.5u"keV"], [:Tl208FEP], [(35.0u"keV", 35.0u"keV")], low_cut = -5.0)
 lplot(report_sf[:Tl208FEP], sf_in_title = true, title = "Survival fraction")
 
 #
