@@ -33,7 +33,7 @@ using TypedTables, PropDicts, Dates
 
 testdata_dir = joinpath(legend_test_data_path(), "data", "legend")
 docsdir = mkpath(joinpath(mktempdir(), "docs-data")) # named in the production tag of the plots
-config = PropDicts.readprops(joinpath(testdata_dir, "julia-config.yaml"))
+config = PropDict(:setups => PropDict(:l200 => PropDicts.readprops(joinpath(testdata_dir, "dataflow-config.yaml"))))
 config.setups.l200.paths[Symbol("tier/raw")] = joinpath(docsdir, "raw")
 
 # The test data holds germanium channels only. Two SiPM channels, one per barrel, are added
@@ -70,19 +70,12 @@ PropDicts.writeprops(joinpath(docsdir, "config.json"), config)
 ENV["LEGEND_DATA_CONFIG"] = joinpath(docsdir, "config.json")
 l200 = LegendData(:l200);
 
-# The event timestamps are looked up in the DAQ cycle keys of the runs, which `runinfo`
-# reads from the metadata `datasets/filekeys`. The test data does not hold them, so the
-# cycle keys of the run are registered by hand.
-
-rinfo = l200.metadata.datasets.runinfo.p02.r006
-fk_cal = FileKey(l200.name, DataPeriod(2), DataRun(6), DataCategory(:cal), Timestamp(rinfo.cal.start_key))
-fk_phy = FileKey(l200.name, DataPeriod(2), DataRun(6), DataCategory(:phy), Timestamp(rinfo.phy.start_key))
-LegendDataManagement._cached_runinfo_dataset[objectid(l200)] = DataSet([fk_cal, fk_phy], l200.dataset);
-
 # One trigger per channel, as the DAQ writes it: the FlashCam `baseline` of every channel,
 # the germanium waveforms presummed over `presum_rate` samples and windowed around the
 # rise, and the SiPM waveforms with two bits dropped, holding a few photoelectron pulses.
 
+fk_cal = start_filekey(l200, :p02, :r006, :cal)
+fk_phy = start_filekey(l200, :p02, :r006, :phy)
 t_spm = range(0u"μs", 100u"μs", length = 6250)
 photoelectrons(t) = sum(a * pulse(t; t0, τ = 3u"μs") for (a, t0) in zip((60, 40, 25), (60u"μs", 61u"μs", 63u"μs")))
 for fk in (fk_cal, fk_phy)

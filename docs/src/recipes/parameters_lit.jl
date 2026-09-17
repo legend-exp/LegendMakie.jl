@@ -11,15 +11,16 @@ using LegendDataTypes, RadiationDetectorSignals # the recipes of LegendData load
 #md using Random; Random.seed!(42) # hide
 
 testdata_dir = joinpath(legend_test_data_path(), "data", "legend")
-ENV["LEGEND_DATA_CONFIG"] = joinpath(testdata_dir, "julia-config.yaml")
+config = PropDict(:setups => PropDict(:l200 => PropDicts.readprops(joinpath(testdata_dir, "dataflow-config.yaml"))))
+configfile = joinpath(mktempdir(), "config.json")
+PropDicts.writeprops(configfile, config)
+ENV["LEGEND_DATA_CONFIG"] = configfile
 l200 = LegendData(:l200);
 
-# The channels of a run are read from the metadata with `channelinfo`. The DAQ cycle keys
-# that `start_filekey` needs are not part of the test data, so the start key of the run
-# is taken from `datasets/runinfo` directly.
+# The channels of a run are read from the metadata with `channelinfo` at the start key of
+# the run.
 
-rinfo = l200.metadata.datasets.runinfo.p02.r000
-filekey = FileKey(l200.name, DataPeriod(2), DataRun(0), DataCategory(:cal), Timestamp(rinfo.cal.start_key))
+filekey = start_filekey(l200, :p02, :r000, :cal)
 chinfo = channelinfo(l200, filekey, system = :geds)
 
 # A parameter is a `PropDict` keyed by detector; nested properties are picked by a vector
