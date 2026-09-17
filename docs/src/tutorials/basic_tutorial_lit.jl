@@ -46,7 +46,11 @@ lines!(rand(10), rand(10))
 lines!(rand(10), rand(10))
 fig
 
-# `LegendMakie` offers a convenience function `add_watermarks!` to add the `Juleana` logo
+# `LegendMakie` offers a convenience function `add_watermarks!` to mark the current figure:
+# it adds the `Juleana` logo with the month of the plot, the tag `PRELIMINARY`, and, when
+# the environment variable `LEGEND_DATA_CONFIG` points to a data production, the name of
+# that production. The recipes of `LegendMakie` call it themselves; see
+# [Plot options](@ref) for the keyword arguments that control it there.
 
 LegendMakie.add_watermarks!()
 
@@ -60,9 +64,10 @@ hist!(1.2 .* randn(8000) .+ 2, bins = -10:0.2:10)
 hist!(0.5.*randn(2000) .- 3, bins = -10:0.2:10)
 fig
 
-# You can also add the LEGEND logo instead of the Juleana logo by calling `legend_logo = true`
+# The LEGEND logo replaces the Juleana logo with `legend_logo = true`, `show_date = false`
+# drops the month, and `position = "outer top"` moves the logo above the axis.
 
-LegendMakie.add_watermarks!(legend_logo = true)
+LegendMakie.add_watermarks!(legend_logo = true, show_date = false, position = "outer top")
 
 
 # Let us now create a composite plot. We do so by creating a `Makie.GridLayout`
