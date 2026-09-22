@@ -7,3 +7,12 @@
 Manifest.toml
 Manifest-v*.toml
 test/lh5
+
+# Documentation build products
+docs/build/
+docs/src/plot_options.md
+docs/src/plot_options.ipynb
+docs/src/tutorials/*.md
+docs/src/tutorials/*.ipynb
+docs/src/recipes/*.md
+docs/src/recipes/*.ipynb

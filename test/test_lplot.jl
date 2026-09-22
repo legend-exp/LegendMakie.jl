@@ -171,6 +171,11 @@ end
             result_fit, report_fit = LegendSpecFits.fit_peaks(result_simple.peakhists, result_simple.peakstats, lines; e_unit=result_simple.unit, calib_type=:th228, m_cal_simple=m_cal_simple)
             @testset "Fit peaks for energy calibration" begin
                 @test_nowarn lplot(report_fit, figsize = (600, 400*length(report_fit)), watermark = false, title = "Test")
+                # a single peak: the data and the components in one legend, the data alone, no legend, a linear scale
+                @test_nowarn lplot(report_fit[:Tl208FEP], legend_position = :rt, title = "Test")
+                @test_nowarn lplot(report_fit[:Tl208FEP], show_components = false, legend_position = :lt, title = "Test")
+                @test_nowarn lplot(report_fit[:Tl208FEP], legend_position = :none, yscale = identity, title = "Test")
+                @test_nowarn lplot(report_fit[:Tl208FEP], show_label = false, title = "Test")
             end
             μ_fit = getfield.(getindex.(Ref(result_fit), lines), :centroid)
             result_calib, report_calib = LegendSpecFits.fit_calibration(1, μ_fit, energies)
@@ -259,7 +264,7 @@ end
             aoe = vcat(randn(30_000), randn(70_000) .- 10)
             e_cal = 1.5u"keV" .* randn(100_000) .+ 2614.5u"keV"
             result_peaks_ds, report_peaks_ds = LegendSpecFits.get_peaks_survival_fractions(
-                aoe, e_cal, [2614.5u"keV"], [:Tl208FEP], [(35.0u"keV",35.0u"keV")], -5.0)
+                aoe, e_cal, [2614.5u"keV"], [:Tl208FEP], [(35.0u"keV",35.0u"keV")], low_cut = -5.0)
             @test_nowarn LegendMakie.lplot(report_peaks_ds[:Tl208FEP], sf_in_title = true, title = "Test")
             @test_nowarn LegendMakie.lplot(report_peaks_ds[:Tl208FEP], sf_in_title = false, title = "Test")
             @test_nowarn LegendMakie.lplot(report_peaks_ds, title = "Test")
@@ -322,7 +327,7 @@ end
         PropDicts.writeprops(joinpath(testdir, "test_config.json"), pd)
         ENV["LEGEND_DATA_CONFIG"] = joinpath(testdir, "test_config.json");
         data = LegendDataManagement.LegendData(:l200)
-        
+
         # create fake data for the two runs used below
         fk_cal = LegendDataManagement.start_filekey(data, :p02, :r006, :cal)
         fk_phy = LegendDataManagement.start_filekey(data, :p02, :r006, :phy)
@@ -335,6 +340,7 @@ end
                 for det in chinfo.detector
                     h["raw/$(det)"] = TypedTables.Table(
                         timestamp = [Dates.datetime2unix(Dates.DateTime(fk))u"s" + 100u"s"],
+                        baseline = [UInt16(100)], presum_rate = [UInt16(8)],
                         waveform_presummed = [RadiationDetectorSignals.RDWaveform(range(0u"μs", 128u"μs", length = 1000), rand(UInt8, 1000))],
                         waveform_windowed = [RadiationDetectorSignals.RDWaveform(range(0u"μs", 128u"μs", length = 1000), rand(UInt8, 1000))],
                     )
@@ -346,17 +352,47 @@ end
         t_cal = Dates.datetime2unix(Dates.DateTime(fk_cal))u"s" + 100u"s"
         t_phy = Dates.datetime2unix(Dates.DateTime(fk_phy))u"s" + 100u"s"
 
+        det = LegendDataManagement.DetectorId(:V99000A)
         @testset "Event plots" begin 
-            @test_nowarn lplot(data, t_cal, figsize = (800,600), xlims = (0,128))
-            @test_nowarn lplot(data, t_phy, figsize = (800,600), xlims = (0,128))
-            @test_nowarn lplot(data, Dates.DateTime(Dates.unix2datetime(t_cal ./ u"s")))
+            @test_nowarn LegendMakie.lplot(data, t_cal, figsize = (800,600), xlims = (0,128))
+            # the test data holds no SiPM channels: the default `system` warns about them
+            @test_logs (:warn,) LegendMakie.lplot!(data, t_phy, xlims = (0,128))
+            @test LegendMakie.lplot(data, t_phy).scene.viewport[].widths == [800, 600]
+            @test_nowarn LegendMakie.lplot(data, t_phy; system = :geds)
+            @test_nowarn LegendMakie.lplot(data, t_phy; system = [:geds])
+            @test_nowarn LegendMakie.lplot(data, t_phy, figsize = (800,600), xlims = (0,128); system=Dict(:geds => [:waveform_windowed]))
+            @test_nowarn LegendMakie.lplot(data, t_phy, figsize = (800,600), xlims = (0,128); system = :geds, subtract_baseline = false)
+            @test_nowarn LegendMakie.lplot(data, t_phy; system = :geds, only_processable = false)
+            @test_throws ArgumentError LegendMakie.lplot(data, t_phy; system = :pmts)
+            # the grouping of the channels, one panel per group, and a filter on the channel information
+            @test_nowarn LegendMakie.lplot(data, t_phy; system = :geds, group = true, color = :group)
+            @test_nowarn LegendMakie.lplot(data, t_phy; system = :geds, group = :hvcard, color = :group)
+            @test_nowarn LegendMakie.lplot(data, t_phy; system = :geds, group = Dict(:geds => :cc4), color = :group)
+            @test LegendMakie.lplot(data, t_phy; system = :geds, exploded = true).scene.viewport[].widths == [1200, 900]
+            @test_nowarn LegendMakie.lplot(data, t_phy; system = :geds, exploded = true, group = :hvcard, ncols = 1)
+            @test_nowarn LegendMakie.lplot(data, t_phy; system = :geds, filterby = r -> r.detector == det)
+            @test_nowarn LegendMakie.lplot(data, t_phy; system = :geds, filterby = Dict(:geds => r -> r.detstring == 1))
+            @test_throws ArgumentError LegendMakie.lplot(data, t_phy; system = :geds, filterby = r -> false)
+            # a grouping colors the channels by group unless `color` says otherwise
+            @test any(c -> c isa Makie.Legend, LegendMakie.lplot(data, t_phy; system = :geds, group = :cc4).content)
+            @test !any(c -> c isa Makie.Legend, LegendMakie.lplot(data, t_phy; system = :geds).content)
+            @test !any(c -> c isa Makie.Legend, LegendMakie.lplot(data, t_phy; system = :geds, group = :cc4, color = :amplitude).content)
+            # channels colored by amplitude, group or one by one
+            @test LegendMakie.lplot(data, t_phy; system = :geds, color = :group) isa Makie.Figure
+            @test LegendMakie.lplot(data, t_phy; system = :geds, color = :channel) isa Makie.Figure
+            @test LegendMakie.lplot(data, t_phy; system = :geds, exploded = true, color = :channel) isa Makie.Figure
+            @test LegendMakie.lplot(data, t_phy; system = :geds, exploded = true, color = :group) isa Makie.Figure
+            @test_throws ArgumentError LegendMakie.lplot(data, t_phy; system = :geds, color = :rainbow)
+            @test_throws ArgumentError LegendMakie.lplot(data, t_phy; system = :geds, color = :group, group = false)
+            @test_nowarn LegendMakie.lplot(data, Dates.DateTime(Dates.unix2datetime(t_cal ./ u"s")))
         end
 
-        det = LegendDataManagement.DetectorId(:V99000A)
         @testset "Detector plots" begin 
-            @test_nowarn lplot(data, t_cal, det, figsize = (800,380), xlims = (0,128))
+            @test lplot(data, t_cal, det, figsize = (800,380), xlims = (0,128)) isa Makie.Figure
+            @test lplot(data, t_cal, det).scene.viewport[].widths == [800, 400]
             @test_throws ArgumentError lplot(data, t_cal .+ 1u"s", det, figsize = (800,380), xlims = (0,128))
-            @test_nowarn lplot(data, t_phy, det, figsize = (800,380), xlims = (0,128), show_label = false)
+            @test lplot(data, t_phy, det, figsize = (800,380), xlims = (0,128), show_label = false) isa Makie.Figure
+            @test lplot(data, t_phy, det, figsize = (800,380), xlims = (0,128), subtract_baseline = false) isa Makie.Figure
         end
 
         # remove test repository

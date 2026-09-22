@@ -57,5 +57,16 @@ function add_logo! end
 function add_legend_logo! end
 function add_juleana_logo! end
 function add_text! end
+"""
+    add_watermarks!(; legend_logo = false, juleana_logo = true, show_date = true, position = "outer right",
+        preliminary = true, approved = false, final = false, production = true)
+
+Mark the current figure: the Juleana logo, or the LEGEND logo with `legend_logo`, with the month
+of the plot unless `show_date = false`, at `position` (`"outer right"` or `"outer top"`) of the
+current axis; the tag `PRELIMINARY`, or `INTERNAL USE ONLY` when `preliminary = false` and not
+`approved`, and no tag when `final`; and, with `production` and the environment variable
+`LEGEND_DATA_CONFIG` set, the name of the data production, the directory of its configuration
+file. Every recipe calls it unless `watermark = false` and passes these keywords on.
+"""
 function add_watermarks! end
 function add_production! end
