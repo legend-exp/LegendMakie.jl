@@ -190,7 +190,7 @@ module LegendMakieLegendDataManagementExt
         g = Makie.GridLayout(fig[1,1])
         ax = Makie.Axis(g[1,1], 
             dim1_conversion = Makie.UnitfulConversion(xunit, units_in_label=false),
-            ytickformat = x -> string.(round.(Int,x)), 
+            ytickformat = LegendMakie.linear_ticklabels, 
             palette = (color = Makie.wong_colors(),), 
             limits = (xlims, nothing), 
             xticks = Makie.WilkinsonTicks(6,k_min=5),
@@ -330,7 +330,7 @@ module LegendMakieLegendDataManagementExt
             g = Makie.GridLayout(fig[1,1])
             axs = map(panels, pos) do p, (r, c)
                 ax = Makie.Axis(g[r, c],
-                    ytickformat = x -> string.(round.(Int,x)),
+                    ytickformat = LegendMakie.linear_ticklabels,
                     palette = (color = Makie.wong_colors(),),
                     limits = (xlims ,nothing),
                     xticks = Makie.WilkinsonTicks(6,k_min=5),
