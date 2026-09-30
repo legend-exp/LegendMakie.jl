@@ -309,6 +309,8 @@ end
             # delete the last entry to test handling missing detectors
             delete!(pd, :V99000A)
             @test_logs (:warn,) LegendMakie.lplot(chinfo, pd)
+            # Check status colors and the missing-data line with the same channel metadata.
+            @test_logs (:warn,) LegendMakie.lplot(chinfo, pd; detector_status_colors = true, watermark = false)
         end
     end
 
