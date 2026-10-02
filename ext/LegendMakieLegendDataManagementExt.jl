@@ -25,6 +25,7 @@ module LegendMakieLegendDataManagementExt
 	    label = nothing,
             color = LegendMakie.AchatBlue,
             detector_status_colors = false, # color detector labels by usability and mark missing data with thin red lines
+            verbose = true,
             legend_logo = true,
             juleana_logo = true,
             approved = false,
@@ -73,7 +74,7 @@ module LegendMakieLegendDataManagementExt
                 if existing
                     push!(yvalues, Unitful.uconvert(u, mval))
                 else
-                    @warn "No entry $(join(string.(properties), '/')) for detector $(det)"
+                    p.verbose[] && @warn "No entry $(join(string.(properties), '/')) for detector $(det)"
                     push!(yvalues, NaN * u)
                     status_colors && push!(missing_xvalues, last(xvalues))
                 end
