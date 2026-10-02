@@ -7,6 +7,7 @@
 using CairoMakie, LegendMakie
 using LegendDataManagement, LegendTestData
 using PropDicts, Measurements, Unitful
+using TypedTables
 using LegendDataTypes, RadiationDetectorSignals # the recipes of LegendData load with the waveform types they read
 #md using Random; Random.seed!(42) # hide
 
@@ -36,3 +37,24 @@ lplot(chinfo, masses, ylabel = "Mass (g)", title = "Detector masses")
 resolution = PropDict(Dict(Symbol(det) => PropDict(:fwhm => measurement(2.5 + 0.3 * randn(), 0.1)u"keV") for det in chinfo.detector))
 delete!(resolution, Symbol(first(chinfo.detector)))
 lplot(chinfo, resolution, [:fwhm], ylabel = "FWHM at Qββ (keV)", title = "Resolution")
+
+# ## Detector status colors
+#
+# Set `detector_status_colors = true` to color detector names by the `usability` column:
+# black for `:on`, golden yellow for `:ac`, and red for `:off`. A missing parameter gets a
+# thin red vertical line while its detector name keeps its status color. String names and
+# string separation lines keep their usual colors. The option is off by default.
+#
+# The test metadata above contains only `:on` detectors, so this small illustrative table
+# shows all three statuses and a missing value.
+
+status_chinfo = Table(detector = [:D01, :D02, :D03, :D04],
+    detstring = [1, 1, 1, 1], position = [1, 2, 3, 4],
+    usability = [:on, :ac, :off, :on])
+status_resolution = PropDict(Dict(
+    :D01 => PropDict(:fwhm => measurement(2.3, 0.1)),
+    :D02 => PropDict(:fwhm => measurement(2.6, 0.1)),
+    :D03 => PropDict(:fwhm => measurement(2.8, 0.1)),
+))
+lplot(status_chinfo, status_resolution, [:fwhm]; detector_status_colors = true,
+    figsize = (850, 450), ylabel = "FWHM at Qββ (keV)", watermark = false)

@@ -24,6 +24,8 @@ module LegendMakieLegendDataManagementExt
             ylabel = missing,
 	    label = nothing,
             color = LegendMakie.AchatBlue,
+            detector_status_colors = false, # color detector labels by usability and mark missing data with thin red lines
+            verbose = true,
             legend_logo = true,
             juleana_logo = true,
             approved = false,
@@ -53,17 +55,16 @@ module LegendMakieLegendDataManagementExt
 
         # collect the data
         labels = Makie.RichText[]
-        labelcolors = Symbol[]
         vlines = Int[]
+        missing_xvalues = Int[]
         xvalues = Int[]
         yvalues = []
-        notworking = Int[]
-        verbose = true
+        status_colors = p.detector_status_colors[]
         for s in sort(unique(chinfo.detstring))
             push!(labels, Makie.rich(Format.format("String:{:02d}", s), color = LegendMakie.AchatBlue))
-            labelcolor = :blue
             push!(vlines, length(labels))
-            for det in sort(chinfo[chinfo.detstring .== s], lt = (a,b) -> a.position < b.position).detector
+            for channel in sort(chinfo[chinfo.detstring .== s], lt = (a,b) -> a.position < b.position)
+                det = channel.detector
                 push!(xvalues, length(labels))
                 existing = false
                 if haskey(pars, det)
@@ -72,13 +73,17 @@ module LegendMakieLegendDataManagementExt
                 end
                 if existing
                     push!(yvalues, Unitful.uconvert(u, mval))
-                    push!(labels, Makie.rich(string(det), color=:black))
                 else
-                    verbose && @warn "No entry $(join(string.(properties), '/')) for detector $(det)"
+                    p.verbose[] && @warn "No entry $(join(string.(properties), '/')) for detector $(det)"
                     push!(yvalues, NaN * u)
-                    push!(notworking, length(labels))
-                    push!(labels, Makie.rich(string(det), color=:red))
+                    status_colors && push!(missing_xvalues, last(xvalues))
                 end
+                labelcolor = if status_colors
+                    get((on = :black, ac = :goldenrod, off = :red), channel.usability, :gray)
+                else
+                    existing ? :black : :red
+                end
+                push!(labels, Makie.rich(string(det), color = labelcolor))
             
             end
         end
@@ -88,9 +93,10 @@ module LegendMakieLegendDataManagementExt
         Makie.errorbars!(p, xvalues, Unitful.ustrip.(u, Measurements.value.(yvalues)), Unitful.ustrip.(u, Measurements.uncertainty.(yvalues)), color = p.color)
         Makie.scatter!(p, xvalues, Unitful.ustrip.(u, Measurements.value.(yvalues)), color = p.color, label = p.label)
         Makie.vlines!(p, vlines .- 1, color = :black)
+        status_colors && !isempty(missing_xvalues) && Makie.vlines!(p, missing_xvalues, color = :red, linewidth = 0.75)
 
         ax = Makie.current_axis()
-        ax.xlabel = p.xlabel[]
+        ax.xlabel = status_colors ? "$(p.xlabel[]) (ON: black, AC: yellow, OFF: red; no data: thin red line)" : p.xlabel[]
         ax.ylabel = ylabel
         ax.xticks = (eachindex(labels) .- 1, labels)
         ax.xticklabelrotation = π/2
