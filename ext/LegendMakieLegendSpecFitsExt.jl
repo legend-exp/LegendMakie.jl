@@ -580,7 +580,7 @@ module LegendMakieLegendSpecFitsExt
 
     # plot per-event FEP residuals against qdrift, rise time and A/E at the legacy and the new optimum;
     # events beyond `residual_range` or the 0.5%-99.5% quantile range of the x variable are clamped into
-    # the edge bins and their fraction is annotated per panel; the "slowest 5%" mean covers all events
+    # the edge bins and their fraction is annotated per panel; non-finite events are dropped and counted; the "slowest 5%" mean covers all events
     function LegendMakie.lplot!(
             report::NamedTuple{(:legacy, :new), <:Tuple{NamedTuple{(:residual, :qdrift, :rise_time, :aoe, :slow_mean)}, NamedTuple{(:residual, :qdrift, :rise_time, :aoe, :slow_mean)}}};
             title::AbstractString = "", titlesize = 18, time_unit = u"µs", nbins::Int = 60, residual_range = (-5, 5),
@@ -601,16 +601,20 @@ module LegendMakieLegendSpecFitsExt
             lo, hi = StatsBase.quantile(filter(isfinite, vcat(vals...)), (0.005, 0.995))
             xedges = range(lo, hi, length = nbins + 1)
             for (col, (label, r, x)) in enumerate(zip(("Legacy", "New"), (report.legacy, report.new), vals))
-                xc = clamp.(x, lo, hi)
-                yc = clamp.(r.residual, residual_range...)
+                # Histogram bins are left-closed, so the upper clamp value is the last float below the upper edge.
+                finite = isfinite.(x) .& isfinite.(r.residual)
+                xf, yf = x[finite], r.residual[finite]
+                xc = clamp.(xf, lo, prevfloat(hi))
+                yc = clamp.(yf, first(residual_range), prevfloat(float(last(residual_range))))
                 h = StatsBase.fit(StatsBase.Histogram, (xc, yc), (xedges, yedges))
-                f_clamped = count((xc .!= x) .| (yc .!= r.residual)) / length(x)
+                f_clamped = count((xf .< lo) .| (xf .> hi) .| (yf .< first(residual_range)) .| (yf .> last(residual_range))) / length(xf)
+                n_nonfinite = count(!, finite)
                 ax = Makie.Axis(g[row, col]; xlabel, ylabel = col == 1 ? "Residual (σ)" : "",
                     title = row == 1 ? "$label optimum" : "", titlefont = :bold)
                 hm = Makie.heatmap!(ax, xedges, yedges, h.weights, colormap = colormap)
                 col == 2 && Makie.Colorbar(g[row, 3], hm, label = "Events")
                 Makie.hlines!(ax, [0.0], color = :white, linestyle = :dash)
-                Makie.text!(ax, 0.98, 0.02, text = "$(round(100 * f_clamped, digits = 1))% beyond range",
+                Makie.text!(ax, 0.98, 0.02, text = "$(round(100 * f_clamped, digits = 1))% beyond range" * (n_nonfinite > 0 ? "\n$n_nonfinite non-finite dropped" : ""),
                     space = :relative, align = (:right, :bottom), color = :white, fontsize = 12)
                 if var == :rise_time
                     Makie.text!(ax, 0.02, 0.98, text = "slowest 5%: $(round(r.slow_mean, digits = 2))σ",

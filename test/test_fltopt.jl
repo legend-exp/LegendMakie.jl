@@ -107,6 +107,22 @@ report_wvfs = (classes = wvf_classes,
     @testset "crosscheck residuals" begin
         @test_nowarn LegendMakie.lplot(report_residuals, title = "Test", figsize = (900, 900))
         @test LegendMakie.lplot(report_residuals, nbins = 30) isa Makie.Figure
+        # Events far outside both ranges are clamped into edge bins, none is lost.
+        n_res = 1000
+        extreme(r) = merge(r, (residual = vcat(r.residual[1:n_res-4], [100.0, -100.0, 100.0, -100.0]),
+            qdrift = vcat(r.qdrift[1:n_res-4], [1e6, 1e6, -1e6, -1e6]),
+            rise_time = r.rise_time[1:n_res], aoe = r.aoe[1:n_res]))
+        extreme_report = (legacy = extreme(fake_residuals(n_res)), new = extreme(fake_residuals(n_res)))
+        fig = LegendMakie.lplot(extreme_report)
+        heatmaps = [p for ax in fig.content if ax isa Makie.Axis for p in ax.scene.plots if p isa Makie.Heatmap]
+        @test length(heatmaps) == 6
+        @test all(hm -> sum(hm[3][]) == n_res, heatmaps)
+        texts = [string(p.text[]) for ax in fig.content if ax isa Makie.Axis for p in ax.scene.plots if p isa Makie.Text]
+        @test any(contains("beyond range"), texts)
+        nan_report = (legacy = merge(report_residuals.legacy, (residual = vcat(NaN, report_residuals.legacy.residual[2:end]),)), new = report_residuals.new)
+        fig = LegendMakie.lplot(nan_report)
+        heatmaps = [p for ax in fig.content if ax isa Makie.Axis for p in ax.scene.plots if p isa Makie.Heatmap]
+        @test sum(heatmaps[1][3][]) == length(report_residuals.legacy.residual) - 1
     end
     @testset "A/E selection" begin
         @test_nowarn LegendMakie.lplot(report_aoe, title = "Test")
