@@ -62,6 +62,16 @@ report_aoe = (h = StatsBase.normalize(StatsBase.fit(StatsBase.Histogram, aoe_val
     f_fit = x -> x < 1.0 ? 0.0 : 2 * Distributions.pdf(Distributions.Normal(1.0, 0.01), x),
     μ = 1.0, σ = 0.01, cut_value = 0.98, n_sigma = 2.0, sf = 0.72)
 
+t_wf = range(0u"µs", 100u"µs", length = 1600)
+t_flt = range(20u"µs", 100u"µs", length = 1280)
+step_wf(t0) = RadiationDetectorSignals.RDWaveform(t_wf, [t < t0 ? 0.0 : 1.0 for t in t_wf] .+ 0.01 .* randn(length(t_wf)))
+flt_wf(t0, width) = RadiationDetectorSignals.RDWaveform(t_flt, [abs(t - t0) < width ? 1.0 : 0.0 for t in t_flt])
+wvf_classes = [:fast, :fast, :slow, :slow, :high_aoe, :high_aoe]
+report_wvfs = (classes = wvf_classes,
+    wvfs = [step_wf(48u"µs") for _ in wvf_classes],
+    flt_legacy = [flt_wf(55u"µs", 2u"µs") for _ in wvf_classes],
+    flt_new = [flt_wf(56u"µs", 3u"µs") for _ in wvf_classes])
+
 @testset "Filter optimization reports" begin
     @testset "ft scan" begin
         @test_nowarn LegendMakie.lplot(report_ft, title = "Test", figsize = (600, 900))
@@ -88,5 +98,11 @@ report_aoe = (h = StatsBase.normalize(StatsBase.fit(StatsBase.Histogram, aoe_val
     @testset "A/E selection" begin
         @test_nowarn LegendMakie.lplot(report_aoe, title = "Test")
         @test LegendMakie.lplot(report_aoe, legend_position = :none) isa Makie.Figure
+    end
+    @testset "example waveforms" begin
+        @test_nowarn LegendMakie.lplot(report_wvfs, title = "Test", figsize = (1200, 600))
+        @test LegendMakie.lplot(report_wvfs) isa Makie.Figure
+        @test LegendMakie.lplot(merge(report_wvfs, (wvfs = RadiationDetectorSignals.ArrayOfRDWaveforms(report_wvfs.wvfs),))) isa Makie.Figure
+        @test_throws DimensionMismatch LegendMakie.lplot(merge(report_wvfs, (flt_new = report_wvfs.flt_new[1:5],)))
     end
 end
