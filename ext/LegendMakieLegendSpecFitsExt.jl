@@ -394,7 +394,7 @@ module LegendMakieLegendSpecFitsExt
         fig
     end
 
-    # plot report from filter optimzations, e.g. fit_enc_sigmas, fit_fwhm_ft, fit_sf_wl 
+    # plot report from filter optimzations, e.g. fit_enc_sigmas, fit_fwhm_ft without qdrift, fit_sf_wl
     function LegendMakie.lplot!(
             report::NamedTuple{(:x, :minx, :y, :miny)};
             title::AbstractString = "", xunit = Unitful.unit(first(report.x)), yunit = Unitful.unit(first(report.y)),
@@ -432,8 +432,16 @@ module LegendMakieLegendSpecFitsExt
         )
     end
 
-    # plot report from fit_fwhm_ft: FWHM, W90, asymmetry and qdrift slope versus flat-top time,
-    # with the optimum of the objective and the legacy FWHM optimum marked
+    function LegendMakie.lplot!(report::NamedTuple{(:ft, :min_fwhm, :e_grid_ft, :fwhm)}; kwargs...)
+        LegendMakie.lplot!(
+            (x = report.e_grid_ft, minx = report.ft, y = report.fwhm, miny = report.min_fwhm);
+            xlabel = "Flat-Top Time", ylabel = "FWHM", xlegendlabel = "FT", ylegendlabel = "FWHM", obj = "Opt.", kwargs...
+        )
+    end
+
+    # plot report from fit_fwhm_ft with qdrift: FWHM, W90, asymmetry and qdrift slope versus flat-top time,
+    # with the optimum of the objective and the legacy FWHM optimum marked; flat-top times whose
+    # fit failed (`table.status != "ok"`) are marked by gray dotted lines
     function LegendMakie.lplot!(
             report::NamedTuple{(:ft, :min_fwhm, :min_objective, :objective, :legacy_ft, :e_grid_ft, :fwhm, :w90, :asym, :fct, :table)};
             title::AbstractString = "", titlesize = 18, xunit = u"µs", e_unit = u"keV",
@@ -446,6 +454,8 @@ module LegendMakieLegendSpecFitsExt
         x = Unitful.ustrip.(xunit, Measurements.value.(report.e_grid_ft))
         ft_new = Unitful.ustrip(xunit, Measurements.value(report.ft))
         ft_legacy = Unitful.ustrip(xunit, Measurements.value(report.legacy_ft))
+        failed = report.table.status .!= "ok"
+        ft_failed = Unitful.ustrip.(xunit, Measurements.value.(report.table.ft[failed]))
         rows = (
             ("FWHM ($e_unit)", Unitful.ustrip.(e_unit, Measurements.value.(report.fwhm))),
             ("W90 ($e_unit)", Unitful.ustrip.(e_unit, Measurements.value.(report.w90))),
@@ -460,17 +470,21 @@ module LegendMakieLegendSpecFitsExt
             Makie.scatterlines!(ax, x, y, color = :black)
             Makie.vlines!(ax, [ft_new], color = :red)
             Makie.vlines!(ax, [ft_legacy], color = :blue, linestyle = :dash)
+            any(failed) && Makie.vlines!(ax, ft_failed, color = :gray, linestyle = :dot)
             push!(axs, ax)
         end
         foreach(ax -> Makie.hidexdecorations!(ax, grid = false), axs[begin:end-1])
         Makie.linkxaxes!(axs...)
         Makie.rowgap!(g, 5)
-        # one legend above the stack, outside of the data; any `legend_position` other than :none enables it
+        # one legend below the stack, outside of the data; any `legend_position` other than :none enables it
         if legend_position != :none
-            Makie.Legend(g[0, 1],
-                [Makie.LineElement(color = :red), Makie.LineElement(color = :blue, linestyle = :dash)],
-                ["Optimum ($(report.objective)): $(round(ft_new, digits = 2)) $xunit", "Legacy (FWHM): $(round(ft_legacy, digits = 2)) $xunit"],
-                orientation = :horizontal, framevisible = false)
+            elements = [Makie.LineElement(color = :red), Makie.LineElement(color = :blue, linestyle = :dash)]
+            labels = ["Optimum ($(report.objective)): $(round(ft_new, digits = 2)) $xunit", "Legacy (FWHM): $(round(ft_legacy, digits = 2)) $xunit"]
+            if any(failed)
+                push!(elements, Makie.LineElement(color = :gray, linestyle = :dot))
+                push!(labels, "Failed")
+            end
+            Makie.Legend(g[length(rows) + 1, 1], elements, labels, orientation = :horizontal, framevisible = false)
         end
 
         Makie.current_axis!(last(axs))
@@ -522,10 +536,11 @@ module LegendMakieLegendSpecFitsExt
         fig
     end
 
-    # plot the crosscheck peaks: every peak at the legacy and the new optimum with its metrics
+    # plot the crosscheck peaks: every peak at the legacy and the new optimum with its metrics;
+    # histograms are drawn as counts per keV so that different bin widths stay comparable
     function LegendMakie.lplot!(
             report::NamedTuple{(:peaks, :legacy, :new)};
-            title::AbstractString = "", titlesize = 18, e_unit = u"keV", yscale = Makie.log10,
+            title::AbstractString = "", titlesize = 18, yscale = Makie.log10,
             watermark::Bool = true, final::Bool = !isempty(title), kwargs...
         )
 
@@ -538,18 +553,18 @@ module LegendMakieLegendSpecFitsExt
 
         axs = Makie.Axis[]
         for (row, i) in enumerate(eachindex(report.peaks, report.legacy, report.new))
-            ax = Makie.Axis(g[row, 1]; yscale, limits = (nothing, ylims), ylabel = "Counts",
-                xlabel = "Energy ($e_unit)", title = replace(string(report.peaks[i]), "_" => " "), titlefont = :bold)
+            ax = Makie.Axis(g[row, 1]; yscale, limits = (nothing, ylims), ylabel = "Counts / keV",
+                xlabel = "Energy (keV)", title = replace(string(report.peaks[i]), "_" => " "), titlefont = :bold)
             for (label, fit, color) in (("Legacy", report.legacy[i], :blue), ("New", report.new[i], :red))
                 edges = first(fit.h.edges)
-                Makie.hist!(ax, StatsBase.midpoints(edges), weights = fit.h.weights, bins = edges,
+                Makie.hist!(ax, StatsBase.midpoints(edges), weights = fit.h.weights ./ step(edges), bins = edges,
                     color = (color, 0.25), fillto = first(ylims))
                 x = range(extrema(edges)..., length = 500)
-                Makie.lines!(ax, x, fit.f_fit.(x) .* step(edges), color = color,
-                    label = "$label: FWHM $(round(e_unit, Measurements.value(fit.fwhm), digits = 2)), " *
-                        "W90 $(round(e_unit, Measurements.value(fit.w90), digits = 2)), asym $(round(Measurements.value(fit.asym), digits = 3))")
+                Makie.lines!(ax, x, fit.f_fit.(x), color = color,
+                    label = "$label: FWHM $(round(u"keV", Measurements.value(fit.fwhm), digits = 2)), " *
+                        "W90 $(round(u"keV", Measurements.value(fit.w90), digits = 2)), asym $(round(Measurements.value(fit.asym), digits = 3))")
             end
-            Makie.axislegend(ax, position = :lt, labelsize = 12)
+            Makie.axislegend(ax, position = :rt, labelsize = 12)
             push!(axs, ax)
         end
         foreach(ax -> ax.xlabel = "", axs[begin:end-1])
@@ -563,7 +578,9 @@ module LegendMakieLegendSpecFitsExt
         fig
     end
 
-    # plot per-event FEP residuals against qdrift, rise time and A/E at the legacy and the new optimum
+    # plot per-event FEP residuals against qdrift, rise time and A/E at the legacy and the new optimum;
+    # events beyond `residual_range` or the 0.5%-99.5% quantile range of the x variable are clamped into
+    # the edge bins and their fraction is annotated per panel; the "slowest 5%" mean covers all events
     function LegendMakie.lplot!(
             report::NamedTuple{(:legacy, :new), <:Tuple{NamedTuple{(:residual, :qdrift, :rise_time, :aoe, :slow_mean)}, NamedTuple{(:residual, :qdrift, :rise_time, :aoe, :slow_mean)}}};
             title::AbstractString = "", titlesize = 18, time_unit = u"µs", nbins::Int = 60, residual_range = (-5, 5),
@@ -584,11 +601,17 @@ module LegendMakieLegendSpecFitsExt
             lo, hi = StatsBase.quantile(filter(isfinite, vcat(vals...)), (0.005, 0.995))
             xedges = range(lo, hi, length = nbins + 1)
             for (col, (label, r, x)) in enumerate(zip(("Legacy", "New"), (report.legacy, report.new), vals))
-                h = StatsBase.fit(StatsBase.Histogram, (x, r.residual), (xedges, yedges))
+                xc = clamp.(x, lo, hi)
+                yc = clamp.(r.residual, residual_range...)
+                h = StatsBase.fit(StatsBase.Histogram, (xc, yc), (xedges, yedges))
+                f_clamped = count((xc .!= x) .| (yc .!= r.residual)) / length(x)
                 ax = Makie.Axis(g[row, col]; xlabel, ylabel = col == 1 ? "Residual (σ)" : "",
                     title = row == 1 ? "$label optimum" : "", titlefont = :bold)
-                Makie.heatmap!(ax, xedges, yedges, h.weights, colormap = colormap)
+                hm = Makie.heatmap!(ax, xedges, yedges, h.weights, colormap = colormap)
+                col == 2 && Makie.Colorbar(g[row, 3], hm, label = "Events")
                 Makie.hlines!(ax, [0.0], color = :white, linestyle = :dash)
+                Makie.text!(ax, 0.98, 0.02, text = "$(round(100 * f_clamped, digits = 1))% beyond range",
+                    space = :relative, align = (:right, :bottom), color = :white, fontsize = 12)
                 if var == :rise_time
                     Makie.text!(ax, 0.02, 0.98, text = "slowest 5%: $(round(r.slow_mean, digits = 2))σ",
                         space = :relative, align = (:left, :top), color = :white)

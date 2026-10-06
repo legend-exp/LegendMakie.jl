@@ -6,7 +6,6 @@ using Test
 import Random
 
 import Distributions
-import LegendSpecFits
 import Measurements
 import RadiationDetectorSignals
 import StatsBase
@@ -18,7 +17,7 @@ import Unitful: @u_str
 rng = Random.MersenneTwister(1)
 e_grid_ft = collect((1.0:0.2:4.0)u"µs")
 n_ft = length(e_grid_ft)
-ok_ft = [i != 3 for i in 1:n_ft]
+ok_ft = [i != 3 for i in eachindex(e_grid_ft)]
 fwhm_all = (2.5 .+ rand(rng, n_ft))u"keV"
 fwhm_all[.!ok_ft] .= NaN * u"keV"
 w90_all = 1.9 .* fwhm_all
@@ -84,6 +83,13 @@ report_wvfs = (classes = wvf_classes,
         @test_nowarn LegendMakie.lplot(report_ft, title = "Test", figsize = (600, 900))
         @test LegendMakie.lplot(report_ft, figsize = (600, 900)) isa Makie.Figure
         @test LegendMakie.lplot(report_ft, legend_position = :none, watermark = false) isa Makie.Figure
+        @test LegendMakie.lplot(merge(report_ft, (table = TypedTables.Table(merge(TypedTables.columns(table_ft), (status = fill("ok", n_ft),))),))) isa Makie.Figure
+    end
+    @testset "ft scan without qdrift" begin
+        fwhm_old = Measurements.measurement.(2.5 .+ rand(rng, n_ft), NaN)u"keV"
+        min_fwhm, idx = findmin(fwhm_old)
+        report_ft_old = (ft = Measurements.measurement(e_grid_ft[idx], 0.2u"µs"), min_fwhm, e_grid_ft, fwhm = fwhm_old)
+        @test_nowarn LegendMakie.lplot(report_ft_old, title = "Test")
     end
     @testset "rt/ft landscape" begin
         @test_nowarn LegendMakie.lplot(report_rtft, legacy = (5.0u"µs", 1.8u"µs"), title = "Test", figsize = (700, 550))
