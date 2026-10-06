@@ -458,14 +458,20 @@ module LegendMakieLegendSpecFitsExt
             ax = Makie.Axis(g[row, 1]; ylabel, xlabel = "Flat-Top Time ($xunit)", titlefont = :bold,
                 title = row == 1 ? title : "", titlesize)
             Makie.scatterlines!(ax, x, y, color = :black)
-            Makie.vlines!(ax, [ft_new], color = :red, label = "Optimum ($(report.objective)): $(round(ft_new, digits = 2)) $xunit")
-            Makie.vlines!(ax, [ft_legacy], color = :blue, linestyle = :dash, label = "Legacy (FWHM): $(round(ft_legacy, digits = 2)) $xunit")
+            Makie.vlines!(ax, [ft_new], color = :red)
+            Makie.vlines!(ax, [ft_legacy], color = :blue, linestyle = :dash)
             push!(axs, ax)
         end
         foreach(ax -> Makie.hidexdecorations!(ax, grid = false), axs[begin:end-1])
         Makie.linkxaxes!(axs...)
         Makie.rowgap!(g, 5)
-        legend_position != :none && Makie.axislegend(first(axs), position = legend_position)
+        # one legend above the stack, outside of the data; any `legend_position` other than :none enables it
+        if legend_position != :none
+            Makie.Legend(g[0, 1],
+                [Makie.LineElement(color = :red), Makie.LineElement(color = :blue, linestyle = :dash)],
+                ["Optimum ($(report.objective)): $(round(ft_new, digits = 2)) $xunit", "Legacy (FWHM): $(round(ft_legacy, digits = 2)) $xunit"],
+                orientation = :horizontal, framevisible = false)
+        end
 
         Makie.current_axis!(last(axs))
         watermark && LegendMakie.add_watermarks!(; final, kwargs...)

@@ -52,13 +52,26 @@ min_enc, idx = findmin(enc)
 rt = measurement(enc_grid_rt[idx], step(enc_grid_rt))
 lplot((; rt, min_enc, enc_grid_rt, enc), title = "ENC noise")
 
-# The energy resolution as a function of the flat-top time:
+# The energy resolution, the W90 width, the asymmetry and the qdrift slope as a function of the
+# flat-top time, with the optimum of the objective and the legacy FWHM optimum marked. The
+# vectors hold the successful grid points, the table all of them:
 
-e_grid_ft = (0.5:0.25:5.0)u"μs"
-fwhm = measurement.(2.5 .+ 0.3 .* (ustrip.(e_grid_ft) .- 2.5).^2 .+ 0.1 .* rand(length(e_grid_ft)), NaN)u"keV"
-min_fwhm, idx = findmin(fwhm)
-ft = measurement(e_grid_ft[idx], step(e_grid_ft))
-lplot((; ft, min_fwhm, e_grid_ft, fwhm), title = "FWHM")
+e_grid_ft = collect((0.5:0.25:5.0)u"μs")
+ok = [i != 4 for i in eachindex(e_grid_ft)]
+fwhm_all = (2.5 .+ 0.3 .* (ustrip.(e_grid_ft) .- 2.5).^2 .+ 0.1 .* rand(length(e_grid_ft)))u"keV"
+fwhm_all[.!ok] .= NaN * u"keV"
+w90_all = 1.9 .* fwhm_all
+asym_all = 1.0 .+ 0.05 .* rand(length(e_grid_ft))
+fct_all = 1e-3 .* rand(length(e_grid_ft))
+table_ft = Table(ft = e_grid_ft, status = [o ? "ok" : "fit failed" for o in ok], fwhm = fwhm_all, w90 = w90_all,
+    asym = asym_all, fct = fct_all)
+i_best = argmin(i -> ok[i] ? ustrip(w90_all[i]) : Inf, eachindex(e_grid_ft))
+report_ft = (
+    ft = measurement(e_grid_ft[i_best], 0.25u"μs"), min_fwhm = fwhm_all[i_best], min_objective = w90_all[i_best],
+    objective = :w90, legacy_ft = measurement(e_grid_ft[i_best - 1], 0.25u"μs"),
+    e_grid_ft = e_grid_ft[ok], fwhm = fwhm_all[ok], w90 = w90_all[ok], asym = asym_all[ok], fct = fct_all[ok], table = table_ft
+)
+lplot(report_ft, title = "Flat-top time scan")
 
 # The survival fraction of the single-escape peak as a function of the window length of the
 # Savitzky-Golay filter of the current:
