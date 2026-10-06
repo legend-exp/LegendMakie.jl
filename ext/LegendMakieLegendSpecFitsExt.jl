@@ -516,6 +516,117 @@ module LegendMakieLegendSpecFitsExt
         fig
     end
 
+    # plot the crosscheck peaks: every peak at the legacy and the new optimum with its metrics
+    function LegendMakie.lplot!(
+            report::NamedTuple{(:peaks, :legacy, :new)};
+            title::AbstractString = "", titlesize = 18, e_unit = u"keV", yscale = Makie.log10,
+            watermark::Bool = true, final::Bool = !isempty(title), kwargs...
+        )
+
+        axes(report.peaks) == axes(report.legacy) == axes(report.new) || throw(DimensionMismatch(
+            "peaks, legacy and new must share axes: $(axes(report.peaks)), $(axes(report.legacy)), $(axes(report.new))"))
+
+        fig = Makie.current_figure()
+        g = Makie.GridLayout(fig[1,1])
+        ylims = yscale == Makie.log10 ? (0.5, nothing) : (0, nothing)
+
+        axs = Makie.Axis[]
+        for (row, i) in enumerate(eachindex(report.peaks, report.legacy, report.new))
+            ax = Makie.Axis(g[row, 1]; yscale, limits = (nothing, ylims), ylabel = "Counts",
+                xlabel = "Energy ($e_unit)", title = replace(string(report.peaks[i]), "_" => " "), titlefont = :bold)
+            for (label, fit, color) in (("Legacy", report.legacy[i], :blue), ("New", report.new[i], :red))
+                edges = first(fit.h.edges)
+                Makie.hist!(ax, StatsBase.midpoints(edges), weights = fit.h.weights, bins = edges,
+                    color = (color, 0.25), fillto = first(ylims))
+                x = range(extrema(edges)..., length = 500)
+                Makie.lines!(ax, x, fit.f_fit.(x) .* step(edges), color = color,
+                    label = "$label: FWHM $(round(e_unit, Measurements.value(fit.fwhm), digits = 2)), " *
+                        "W90 $(round(e_unit, Measurements.value(fit.w90), digits = 2)), asym $(round(Measurements.value(fit.asym), digits = 3))")
+            end
+            Makie.axislegend(ax, position = :lt, labelsize = 12)
+            push!(axs, ax)
+        end
+        foreach(ax -> ax.xlabel = "", axs[begin:end-1])
+
+        if !isempty(title)
+            Makie.Label(g[1, :, Makie.Top()], title, padding = (0, 0, 25, 0), fontsize = titlesize, font = :bold)
+        end
+
+        Makie.current_axis!(last(axs))
+        watermark && LegendMakie.add_watermarks!(; final, kwargs...)
+        fig
+    end
+
+    # plot per-event FEP residuals against qdrift, rise time and A/E at the legacy and the new optimum
+    function LegendMakie.lplot!(
+            report::NamedTuple{(:legacy, :new), <:Tuple{NamedTuple{(:residual, :qdrift, :rise_time, :aoe, :slow_mean)}, NamedTuple{(:residual, :qdrift, :rise_time, :aoe, :slow_mean)}}};
+            title::AbstractString = "", titlesize = 18, time_unit = u"µs", nbins::Int = 60, residual_range = (-5, 5),
+            colormap = :viridis, watermark::Bool = true, final::Bool = !isempty(title), kwargs...
+        )
+
+        fig = Makie.current_figure()
+        g = Makie.GridLayout(fig[1,1])
+        yedges = range(residual_range..., length = nbins + 1)
+        variables = ((:qdrift, "Qdrift (a.u.)"), (:rise_time, "Rise time 10-90% ($time_unit)"), (:aoe, "A/E (a.u.)"))
+
+        ax = nothing
+        for (row, (var, xlabel)) in enumerate(variables)
+            vals = map((report.legacy, report.new)) do r
+                v = getproperty(r, var)
+                eltype(v) <: Unitful.Quantity ? Unitful.ustrip.(time_unit, v) : v
+            end
+            lo, hi = StatsBase.quantile(filter(isfinite, vcat(vals...)), (0.005, 0.995))
+            xedges = range(lo, hi, length = nbins + 1)
+            for (col, (label, r, x)) in enumerate(zip(("Legacy", "New"), (report.legacy, report.new), vals))
+                h = StatsBase.fit(StatsBase.Histogram, (x, r.residual), (xedges, yedges))
+                ax = Makie.Axis(g[row, col]; xlabel, ylabel = col == 1 ? "Residual (σ)" : "",
+                    title = row == 1 ? "$label optimum" : "", titlefont = :bold)
+                Makie.heatmap!(ax, xedges, yedges, h.weights, colormap = colormap)
+                Makie.hlines!(ax, [0.0], color = :white, linestyle = :dash)
+                if var == :rise_time
+                    Makie.text!(ax, 0.02, 0.98, text = "slowest 5%: $(round(r.slow_mean, digits = 2))σ",
+                        space = :relative, align = (:left, :top), color = :white)
+                end
+            end
+        end
+
+        if !isempty(title)
+            Makie.Label(g[1, :, Makie.Top()], title, padding = (0, 0, 25, 0), fontsize = titlesize, font = :bold)
+        end
+
+        Makie.current_axis!(ax)
+        watermark && LegendMakie.add_watermarks!(; final, kwargs...)
+        fig
+    end
+
+    # plot the coarse in-situ single-site A/E selection of the filter crosscheck
+    function LegendMakie.lplot!(
+            report::NamedTuple{(:h, :f_fit, :μ, :σ, :cut_value, :n_sigma, :sf)};
+            title::AbstractString = "", titlesize = 18, xlabel = "A/E (a.u.)", legend_position = :lt,
+            watermark::Bool = true, final::Bool = !isempty(title), kwargs...
+        )
+
+        fig = Makie.current_figure()
+        edges = first(report.h.edges)
+        ax = Makie.Axis(fig[1,1]; title, titlesize, titlefont = :bold, xlabel, ylabel = "Normalized counts",
+            limits = ((report.μ - 8 * report.σ, report.μ + 5 * report.σ), (0, nothing)))
+
+        Makie.hist!(ax, StatsBase.midpoints(edges), weights = report.h.weights, bins = edges,
+            color = LegendMakie.DiamondGrey, label = "Data")
+        x = range(report.μ - 3 * report.σ, report.μ + 5 * report.σ, length = 500)
+        Makie.lines!(ax, x, report.f_fit.(x), color = :red,
+            label = "Half-Gaussian fit\nμ = $(round(report.μ, sigdigits = 4)), σ = $(round(report.σ, sigdigits = 2))")
+        Makie.vlines!(ax, [report.cut_value], color = LegendMakie.CoaxGreen, linewidth = 2.5,
+            label = "Cut at μ - $(report.n_sigma)σ, keeps $(round(100 * report.sf, digits = 1))%")
+        Makie.text!(ax, 0.98, 0.02, text = "coarse in-situ selection, not the calibrated A/E cut",
+            space = :relative, align = (:right, :bottom), fontsize = 12)
+        legend_position != :none && Makie.axislegend(ax, position = legend_position)
+
+        Makie.current_axis!(ax)
+        watermark && LegendMakie.add_watermarks!(; final, kwargs...)
+        fig
+    end
+
     function LegendMakie.lplot!(report::NamedTuple{(:wl, :min_sf, :a_grid_wl_sg, :sfs)}; kwargs...)
         LegendMakie.lplot!(
             (x = report.a_grid_wl_sg, minx = report.wl, y = report.sfs, miny = report.min_sf);

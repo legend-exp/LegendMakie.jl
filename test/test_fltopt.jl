@@ -41,6 +41,27 @@ table_rtft = TypedTables.Table(rt = rts, ft = fts, stage = fill(:neighbor, n_rtf
 search_path = [(5.0u"µs", 2.0u"µs"), (5.5u"µs", 2.0u"µs"), (5.5u"µs", 2.2u"µs")]
 report_rtft = (rt = 5.5u"µs", ft = 2.2u"µs", objective = :w90, table = table_rtft, path = search_path)
 
+function fake_peak_fit(μ, σ, n)
+    x = μ .+ σ .* randn(n)
+    h = StatsBase.fit(StatsBase.Histogram, x, (μ - 10σ):(σ / 4):(μ + 6σ))
+    f_fit = e -> n * Distributions.pdf(Distributions.Normal(μ, σ), e)
+    (h = h, f_fit = f_fit, μ = μ * u"keV", σ = σ * u"keV", fwhm = 2.355σ * u"keV", w90 = 3.29σ * u"keV", asym = 1.0)
+end
+report_peaks = (peaks = [:FEP, :DEP, :SEP],
+    legacy = [fake_peak_fit(2614.5, 1.1, 20000), fake_peak_fit(1592.5, 0.9, 3000), fake_peak_fit(2103.5, 1.0, 5000)],
+    new = [fake_peak_fit(2614.5, 1.0, 20000), fake_peak_fit(1592.5, 0.85, 3000), fake_peak_fit(2103.5, 0.95, 5000)])
+
+function fake_residuals(n)
+    rise_time = (0.3 .+ rand(n))u"µs"
+    (residual = randn(n), qdrift = rand(n) .* 100, rise_time = rise_time, aoe = 1.0 .+ 0.02 .* randn(n), slow_mean = -0.2)
+end
+report_residuals = (legacy = fake_residuals(5000), new = fake_residuals(5000))
+
+aoe_values = vcat(1.0 .+ 0.01 .* randn(20000), 0.85 .+ 0.05 .* randn(8000))
+report_aoe = (h = StatsBase.normalize(StatsBase.fit(StatsBase.Histogram, aoe_values, 0.7:0.002:1.1), mode = :pdf),
+    f_fit = x -> x < 1.0 ? 0.0 : 2 * Distributions.pdf(Distributions.Normal(1.0, 0.01), x),
+    μ = 1.0, σ = 0.01, cut_value = 0.98, n_sigma = 2.0, sf = 0.72)
+
 @testset "Filter optimization reports" begin
     @testset "ft scan" begin
         @test_nowarn LegendMakie.lplot(report_ft, title = "Test", figsize = (600, 900))
@@ -54,5 +75,18 @@ report_rtft = (rt = 5.5u"µs", ft = 2.2u"µs", objective = :w90, table = table_r
         @test LegendMakie.lplot(merge(report_rtft, (objective = :asym,)), legend_position = :none) isa Makie.Figure
         @test_throws ArgumentError LegendMakie.lplot(merge(report_rtft,
             (table = TypedTables.Table(merge(TypedTables.columns(table_rtft), (w90 = fill(NaN * u"keV", n_rtft),))),)))
+    end
+    @testset "crosscheck peaks" begin
+        @test_nowarn LegendMakie.lplot(report_peaks, title = "Test", figsize = (700, 900))
+        @test LegendMakie.lplot(report_peaks, yscale = identity) isa Makie.Figure
+        @test_throws DimensionMismatch LegendMakie.lplot(merge(report_peaks, (new = report_peaks.new[1:2],)))
+    end
+    @testset "crosscheck residuals" begin
+        @test_nowarn LegendMakie.lplot(report_residuals, title = "Test", figsize = (900, 900))
+        @test LegendMakie.lplot(report_residuals, nbins = 30) isa Makie.Figure
+    end
+    @testset "A/E selection" begin
+        @test_nowarn LegendMakie.lplot(report_aoe, title = "Test")
+        @test LegendMakie.lplot(report_aoe, legend_position = :none) isa Makie.Figure
     end
 end
