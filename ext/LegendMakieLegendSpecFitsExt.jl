@@ -472,6 +472,50 @@ module LegendMakieLegendSpecFitsExt
         fig
     end
 
+    # plot report from optimize_rtft: every evaluated (rt, ft) colored by its objective value,
+    # failed evaluations hollow, the accepted search path, seed, optimum and optional legacy optimum
+    function LegendMakie.lplot!(
+            report::NamedTuple{(:rt, :ft, :objective, :table, :path)};
+            legacy = nothing, title::AbstractString = "", titlesize = 18, xunit = u"µs", yunit = u"µs",
+            colormap = :viridis, legend_position = :rt, watermark::Bool = true, final::Bool = !isempty(title), kwargs...
+        )
+
+        t = report.table
+        obj = report.objective == :fwhm_asym ? t.fwhm .* t.asym : getproperty(t, report.objective)
+        obj_unit = Unitful.unit(first(obj))
+        z = Unitful.ustrip.(obj_unit, Measurements.value.(obj))
+        rt = Unitful.ustrip.(xunit, Measurements.value.(t.rt))
+        ft = Unitful.ustrip.(yunit, Measurements.value.(t.ft))
+        valid = isfinite.(z)
+        any(valid) || throw(ArgumentError("The table of the rt/ft search holds no finite $(report.objective) value"))
+
+        fig = Makie.current_figure()
+        ax = Makie.Axis(fig[1,1]; title, titlesize, titlefont = :bold,
+            xlabel = "Rise Time ($xunit)", ylabel = "Flat-Top Time ($yunit)")
+
+        sc = Makie.scatter!(ax, rt[valid], ft[valid], color = z[valid], colormap = colormap, markersize = 14)
+        if !all(valid)
+            Makie.scatter!(ax, rt[.!valid], ft[.!valid], color = :transparent, strokecolor = :black, strokewidth = 1.5,
+                markersize = 14, label = "Failed")
+        end
+        path_rt = [Unitful.ustrip(xunit, Measurements.value(first(p))) for p in report.path]
+        path_ft = [Unitful.ustrip(yunit, Measurements.value(last(p))) for p in report.path]
+        Makie.lines!(ax, path_rt, path_ft, color = :black, label = "Search path")
+        Makie.scatter!(ax, path_rt[begin:begin], path_ft[begin:begin], marker = :diamond, color = :orange, markersize = 18, label = "Seed")
+        Makie.scatter!(ax, [Unitful.ustrip(xunit, Measurements.value(report.rt))], [Unitful.ustrip(yunit, Measurements.value(report.ft))],
+            marker = :star5, color = :red, markersize = 22, label = "Optimum")
+        if !isnothing(legacy)
+            Makie.scatter!(ax, [Unitful.ustrip(xunit, Measurements.value(first(legacy)))], [Unitful.ustrip(yunit, Measurements.value(last(legacy)))],
+                marker = :xcross, color = :blue, markersize = 18, label = "Legacy")
+        end
+        Makie.Colorbar(fig[1,2], sc, label = obj_unit == Unitful.NoUnits ? string(report.objective) : "$(report.objective) ($obj_unit)")
+        legend_position != :none && Makie.axislegend(ax, position = legend_position)
+
+        Makie.current_axis!(ax)
+        watermark && LegendMakie.add_watermarks!(; final, kwargs...)
+        fig
+    end
+
     function LegendMakie.lplot!(report::NamedTuple{(:wl, :min_sf, :a_grid_wl_sg, :sfs)}; kwargs...)
         LegendMakie.lplot!(
             (x = report.a_grid_wl_sg, minx = report.wl, y = report.sfs, miny = report.min_sf);
