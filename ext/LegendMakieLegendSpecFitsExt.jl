@@ -432,11 +432,44 @@ module LegendMakieLegendSpecFitsExt
         )
     end
 
-    function LegendMakie.lplot!(report::NamedTuple{(:ft, :min_fwhm, :e_grid_ft, :fwhm)}; kwargs...)
-        LegendMakie.lplot!(
-            (x = report.e_grid_ft, minx = report.ft, y = report.fwhm, miny = report.min_fwhm);
-            xlabel = "Flat-Top Time", ylabel = "FWHM", xlegendlabel = "FT", ylegendlabel = "FWHM", obj = "Opt.", kwargs...
+    # plot report from fit_fwhm_ft: FWHM, W90, asymmetry and qdrift slope versus flat-top time,
+    # with the optimum of the objective and the legacy FWHM optimum marked
+    function LegendMakie.lplot!(
+            report::NamedTuple{(:ft, :min_fwhm, :min_objective, :objective, :legacy_ft, :e_grid_ft, :fwhm, :w90, :asym, :fct, :table)};
+            title::AbstractString = "", titlesize = 18, xunit = u"µs", e_unit = u"keV",
+            legend_position = :rt, watermark::Bool = true, final::Bool = !isempty(title), kwargs...
         )
+
+        fig = Makie.current_figure()
+        g = Makie.GridLayout(fig[1,1])
+
+        x = Unitful.ustrip.(xunit, Measurements.value.(report.e_grid_ft))
+        ft_new = Unitful.ustrip(xunit, Measurements.value(report.ft))
+        ft_legacy = Unitful.ustrip(xunit, Measurements.value(report.legacy_ft))
+        rows = (
+            ("FWHM ($e_unit)", Unitful.ustrip.(e_unit, Measurements.value.(report.fwhm))),
+            ("W90 ($e_unit)", Unitful.ustrip.(e_unit, Measurements.value.(report.w90))),
+            ("Asymmetry", Measurements.value.(report.asym)),
+            ("Qdrift slope", Measurements.value.(report.fct))
+        )
+
+        axs = Makie.Axis[]
+        for (row, (ylabel, y)) in enumerate(rows)
+            ax = Makie.Axis(g[row, 1]; ylabel, xlabel = "Flat-Top Time ($xunit)", titlefont = :bold,
+                title = row == 1 ? title : "", titlesize)
+            Makie.scatterlines!(ax, x, y, color = :black)
+            Makie.vlines!(ax, [ft_new], color = :red, label = "Optimum ($(report.objective)): $(round(ft_new, digits = 2)) $xunit")
+            Makie.vlines!(ax, [ft_legacy], color = :blue, linestyle = :dash, label = "Legacy (FWHM): $(round(ft_legacy, digits = 2)) $xunit")
+            push!(axs, ax)
+        end
+        foreach(ax -> Makie.hidexdecorations!(ax, grid = false), axs[begin:end-1])
+        Makie.linkxaxes!(axs...)
+        Makie.rowgap!(g, 5)
+        legend_position != :none && Makie.axislegend(first(axs), position = legend_position)
+
+        Makie.current_axis!(last(axs))
+        watermark && LegendMakie.add_watermarks!(; final, kwargs...)
+        fig
     end
 
     function LegendMakie.lplot!(report::NamedTuple{(:wl, :min_sf, :a_grid_wl_sg, :sfs)}; kwargs...)
