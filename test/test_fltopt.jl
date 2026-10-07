@@ -96,6 +96,12 @@ report_wvfs = (classes = wvf_classes,
         @test LegendMakie.lplot(report_rtft) isa Makie.Figure
         @test LegendMakie.lplot(merge(report_rtft, (objective = :fwhm_asym,))) isa Makie.Figure
         @test LegendMakie.lplot(merge(report_rtft, (objective = :asym,)), legend_position = :none) isa Makie.Figure
+        # optimum off the path: a segment from the last path point to the optimum
+        optimum_segments(fig) = [p for ax in fig.content if ax isa Makie.Axis for p in ax.scene.plots if p isa Makie.Lines && p.label[] == "Path to optimum"]
+        fig = LegendMakie.lplot(merge(report_rtft, (rt = 5.0u"µs", ft = 2.4u"µs")))
+        @test fig isa Makie.Figure
+        @test length(optimum_segments(fig)) == 1
+        @test isempty(optimum_segments(LegendMakie.lplot(report_rtft)))
         @test_throws ArgumentError LegendMakie.lplot(merge(report_rtft,
             (table = TypedTables.Table(merge(TypedTables.columns(table_rtft), (w90 = fill(NaN * u"keV", n_rtft),))),)))
     end
@@ -103,10 +109,15 @@ report_wvfs = (classes = wvf_classes,
         @test_nowarn LegendMakie.lplot(report_peaks, title = "Test", figsize = (700, 900))
         @test LegendMakie.lplot(report_peaks, yscale = identity) isa Makie.Figure
         @test_throws DimensionMismatch LegendMakie.lplot(merge(report_peaks, (new = report_peaks.new[1:2],)))
+        empty_fit(f) = merge(f, (h = StatsBase.Histogram(first(f.h.edges), zeros(Int, length(f.h.weights))),))
+        report_empty = (peaks = report_peaks.peaks, legacy = empty_fit.(report_peaks.legacy), new = empty_fit.(report_peaks.new))
+        @test LegendMakie.lplot(report_empty) isa Makie.Figure
+        @test LegendMakie.lplot(report_empty, yscale = identity) isa Makie.Figure
     end
     @testset "crosscheck residuals" begin
         @test_nowarn LegendMakie.lplot(report_residuals, title = "Test", figsize = (900, 900))
         @test LegendMakie.lplot(report_residuals, nbins = 30) isa Makie.Figure
+        @test LegendMakie.lplot(report_residuals, position = "outer top") isa Makie.Figure
         # Events far outside both ranges are clamped into edge bins, none is lost.
         n_res = 1000
         extreme(r) = merge(r, (residual = vcat(r.residual[1:n_res-4], [100.0, -100.0, 100.0, -100.0]),
