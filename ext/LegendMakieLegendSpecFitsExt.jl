@@ -460,7 +460,7 @@ module LegendMakieLegendSpecFitsExt
             ("FWHM ($e_unit)", Unitful.ustrip.(e_unit, Measurements.value.(report.fwhm))),
             ("W90 ($e_unit)", Unitful.ustrip.(e_unit, Measurements.value.(report.w90))),
             ("Asymmetry", Measurements.value.(report.asym)),
-            ("Qdrift slope", Measurements.value.(report.fct))
+            ("Qdrift slope (ADC / qdrift)", Measurements.value.(report.fct))
         )
 
         axs = Makie.Axis[]
@@ -521,9 +521,12 @@ module LegendMakieLegendSpecFitsExt
         path_rt = [Unitful.ustrip(xunit, Measurements.value(first(p))) for p in report.path]
         path_ft = [Unitful.ustrip(yunit, Measurements.value(last(p))) for p in report.path]
         Makie.lines!(ax, path_rt, path_ft, color = :black, label = "Search path")
+        rt_opt, ft_opt = Unitful.ustrip(xunit, Measurements.value(report.rt)), Unitful.ustrip(yunit, Measurements.value(report.ft))
+        # the optimum can differ from the last accepted point of the search path
+        (last(path_rt), last(path_ft)) == (rt_opt, ft_opt) ||
+            Makie.lines!(ax, [last(path_rt), rt_opt], [last(path_ft), ft_opt], color = :black, linestyle = :dot, label = "Path to optimum")
         Makie.scatter!(ax, path_rt[begin:begin], path_ft[begin:begin], marker = :diamond, color = :orange, markersize = 18, label = "Seed")
-        Makie.scatter!(ax, [Unitful.ustrip(xunit, Measurements.value(report.rt))], [Unitful.ustrip(yunit, Measurements.value(report.ft))],
-            marker = :star5, color = :red, markersize = 22, label = "Optimum")
+        Makie.scatter!(ax, [rt_opt], [ft_opt], marker = :star5, color = :red, markersize = 22, label = "Optimum")
         if !isnothing(legacy)
             Makie.scatter!(ax, [Unitful.ustrip(xunit, Measurements.value(first(legacy)))], [Unitful.ustrip(yunit, Measurements.value(last(legacy)))],
                 marker = :xcross, color = :blue, markersize = 18, label = "Legacy")
@@ -558,6 +561,8 @@ module LegendMakieLegendSpecFitsExt
         for (row, i) in enumerate(eachindex(report.peaks, report.legacy, report.new))
             # headroom above the highest bin keeps the legend clear of the peak
             ymax = maximum(f -> maximum(f.h.weights) / step(first(f.h.edges)), (report.legacy[i], report.new[i]))
+            # an empty histogram gets a floor so that the limits stay a valid range
+            ymax > 0 || (ymax = 1.0)
             ylims = (ylow, yscale == Makie.log10 ? 100 * ymax : 1.8 * ymax)
             ax = Makie.Axis(g[row, 1]; yscale, limits = (nothing, ylims), ylabel = "Counts / keV",
                 xlabel = "Energy (keV)", title = replace(string(report.peaks[i]), "_" => " "), titlefont = :bold)
@@ -590,7 +595,7 @@ module LegendMakieLegendSpecFitsExt
     function LegendMakie.lplot!(
             report::NamedTuple{(:legacy, :new), <:Tuple{NamedTuple{(:residual, :qdrift, :rise_time, :aoe, :slow_mean)}, NamedTuple{(:residual, :qdrift, :rise_time, :aoe, :slow_mean)}}};
             title::AbstractString = "", titlesize = 18, time_unit = u"µs", nbins::Int = 60, residual_range = (-5, 5),
-            colormap = :viridis, watermark::Bool = true, final::Bool = !isempty(title), kwargs...
+            colormap = :viridis, position = "outer top", watermark::Bool = true, final::Bool = !isempty(title), kwargs...
         )
 
         fig = Makie.current_figure()
@@ -635,7 +640,7 @@ module LegendMakieLegendSpecFitsExt
         # the colorbars occupy the space right of the panels: the watermark sits above the
         # top-left panel, whose title is right-aligned
         Makie.current_axis!(first(Makie.contents(g[1, 1])))
-        watermark && LegendMakie.add_watermarks!(; position = "outer top", final, kwargs...)
+        watermark && LegendMakie.add_watermarks!(; position, final, kwargs...)
         fig
     end
 
