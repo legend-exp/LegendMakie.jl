@@ -528,8 +528,11 @@ module LegendMakieLegendSpecFitsExt
             Makie.scatter!(ax, [Unitful.ustrip(xunit, Measurements.value(first(legacy)))], [Unitful.ustrip(yunit, Measurements.value(last(legacy)))],
                 marker = :xcross, color = :blue, markersize = 18, label = "Legacy")
         end
-        Makie.Colorbar(fig[1,2], sc, label = obj_unit == Unitful.NoUnits ? string(report.objective) : "$(report.objective) ($obj_unit)")
-        legend_position != :none && Makie.axislegend(ax, position = legend_position)
+        # colorbar and legend below the axis, outside of the data, which keeps the space right of
+        # the axis free for the watermark; any `legend_position` other than :none enables the legend
+        Makie.Colorbar(fig[2,1], sc, vertical = false, flipaxis = false,
+            label = obj_unit == Unitful.NoUnits ? string(report.objective) : "$(report.objective) ($obj_unit)")
+        legend_position != :none && Makie.Legend(fig[3,1], ax, orientation = :horizontal, framevisible = false)
 
         Makie.current_axis!(ax)
         watermark && LegendMakie.add_watermarks!(; final, kwargs...)
@@ -549,16 +552,19 @@ module LegendMakieLegendSpecFitsExt
 
         fig = Makie.current_figure()
         g = Makie.GridLayout(fig[1,1])
-        ylims = yscale == Makie.log10 ? (0.5, nothing) : (0, nothing)
+        ylow = yscale == Makie.log10 ? 0.5 : 0.0
 
         axs = Makie.Axis[]
         for (row, i) in enumerate(eachindex(report.peaks, report.legacy, report.new))
+            # headroom above the highest bin keeps the legend clear of the peak
+            ymax = maximum(f -> maximum(f.h.weights) / step(first(f.h.edges)), (report.legacy[i], report.new[i]))
+            ylims = (ylow, yscale == Makie.log10 ? 100 * ymax : 1.8 * ymax)
             ax = Makie.Axis(g[row, 1]; yscale, limits = (nothing, ylims), ylabel = "Counts / keV",
                 xlabel = "Energy (keV)", title = replace(string(report.peaks[i]), "_" => " "), titlefont = :bold)
             for (label, fit, color) in (("Legacy", report.legacy[i], :blue), ("New", report.new[i], :red))
                 edges = first(fit.h.edges)
                 Makie.hist!(ax, StatsBase.midpoints(edges), weights = fit.h.weights ./ step(edges), bins = edges,
-                    color = (color, 0.25), fillto = first(ylims))
+                    color = (color, 0.25), fillto = ylow)
                 x = range(extrema(edges)..., length = 500)
                 Makie.lines!(ax, x, fit.f_fit.(x), color = color,
                     label = "$label: FWHM $(round(u"keV", Measurements.value(fit.fwhm), digits = 2)), " *
@@ -592,7 +598,6 @@ module LegendMakieLegendSpecFitsExt
         yedges = range(residual_range..., length = nbins + 1)
         variables = ((:qdrift, "Qdrift (a.u.)"), (:rise_time, "Rise time 10-90% ($time_unit)"), (:aoe, "A/E (a.u.)"))
 
-        ax = nothing
         for (row, (var, xlabel)) in enumerate(variables)
             vals = map((report.legacy, report.new)) do r
                 v = getproperty(r, var)
@@ -610,7 +615,7 @@ module LegendMakieLegendSpecFitsExt
                 f_clamped = count((xf .< lo) .| (xf .> hi) .| (yf .< first(residual_range)) .| (yf .> last(residual_range))) / length(xf)
                 n_nonfinite = count(!, finite)
                 ax = Makie.Axis(g[row, col]; xlabel, ylabel = col == 1 ? "Residual (σ)" : "",
-                    title = row == 1 ? "$label optimum" : "", titlefont = :bold)
+                    title = row == 1 ? "$label optimum" : "", titlefont = :bold, titlealign = :right)
                 hm = Makie.heatmap!(ax, xedges, yedges, h.weights, colormap = colormap)
                 col == 2 && Makie.Colorbar(g[row, 3], hm, label = "Events")
                 Makie.hlines!(ax, [0.0], color = :white, linestyle = :dash)
@@ -627,8 +632,10 @@ module LegendMakieLegendSpecFitsExt
             Makie.Label(g[1, :, Makie.Top()], title, padding = (0, 0, 25, 0), fontsize = titlesize, font = :bold)
         end
 
-        Makie.current_axis!(ax)
-        watermark && LegendMakie.add_watermarks!(; final, kwargs...)
+        # the colorbars occupy the space right of the panels: the watermark sits above the
+        # top-left panel, whose title is right-aligned
+        Makie.current_axis!(first(Makie.contents(g[1, 1])))
+        watermark && LegendMakie.add_watermarks!(; position = "outer top", final, kwargs...)
         fig
     end
 
