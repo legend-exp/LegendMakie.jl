@@ -639,10 +639,13 @@ module LegendMakieLegendSpecFitsExt
         fig
     end
 
-    # plot the coarse in-situ single-site A/E selection of the filter crosscheck
+    # plot the coarse in-situ single-site A/E selection of the filter crosscheck: the histogram and
+    # the fit describe the sample the band is fitted on (`fit_label`), the kept fraction `sf` refers
+    # to the sample the cut is applied to (`selection_label`)
     function LegendMakie.lplot!(
             report::NamedTuple{(:h, :f_fit, :μ, :σ, :cut_value, :n_sigma, :sf)};
             title::AbstractString = "", titlesize = 18, xlabel = "A/E (a.u.)", legend_position = :lt,
+            fit_label::AbstractString = "DEP", selection_label::AbstractString = "FEP",
             watermark::Bool = true, final::Bool = !isempty(title), kwargs...
         )
 
@@ -652,12 +655,12 @@ module LegendMakieLegendSpecFitsExt
             limits = ((report.μ - 8 * report.σ, report.μ + 5 * report.σ), (0, nothing)))
 
         Makie.hist!(ax, StatsBase.midpoints(edges), weights = report.h.weights, bins = edges,
-            color = LegendMakie.DiamondGrey, label = "Data")
+            color = LegendMakie.DiamondGrey, label = fit_label)
         x = range(report.μ - 3 * report.σ, report.μ + 5 * report.σ, length = 500)
         Makie.lines!(ax, x, report.f_fit.(x), color = :red,
             label = "Half-Gaussian fit\nμ = $(round(report.μ, sigdigits = 4)), σ = $(round(report.σ, sigdigits = 2))")
         Makie.vlines!(ax, [report.cut_value], color = LegendMakie.CoaxGreen, linewidth = 2.5,
-            label = "Cut at μ - $(report.n_sigma)σ, keeps $(round(100 * report.sf, digits = 1))%")
+            label = "Cut at μ - $(report.n_sigma)σ, keeps $(round(100 * report.sf, digits = 1))% of $selection_label")
         Makie.text!(ax, 0.98, 0.02, text = "coarse in-situ selection, not the calibrated A/E cut",
             space = :relative, align = (:right, :bottom), fontsize = 12)
         legend_position != :none && Makie.axislegend(ax, position = legend_position)

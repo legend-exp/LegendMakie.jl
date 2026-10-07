@@ -127,6 +127,7 @@ report_wvfs = (classes = wvf_classes,
     @testset "A/E selection" begin
         @test_nowarn LegendMakie.lplot(report_aoe, title = "Test")
         @test LegendMakie.lplot(report_aoe, legend_position = :none) isa Makie.Figure
+        @test LegendMakie.lplot(report_aoe, fit_label = "fit sample", selection_label = "selected sample") isa Makie.Figure
     end
     @testset "example waveforms" begin
         @test_nowarn LegendMakie.lplot(report_wvfs, title = "Test", figsize = (1200, 600))
