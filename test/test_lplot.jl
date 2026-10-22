@@ -154,7 +154,7 @@ end
             ecal = filter(x -> x <= 265_000, vcat(rand(Distributions.Exponential(70_000),97_000), 261_450 .+ 200 .* randn(2_000), 210_350 .+ 185 .* randn(500), 159_300 .+ 170 .* randn(500)))
             lines = [:Tl208DEP, :Tl208SEP, :Tl208FEP]
             energies = [1592.513, 2103.512, 2614.511]u"keV"
-            result_autocal, report_autocal = LegendSpecFits.autocal_energy(ecal, energies, α = 0.01, rtol = 2)
+            result_autocal, report_autocal = LegendSpecFits.autocal_energy(ecal, energies, α = 0.01)
             @testset "Autocal energy" begin
                 @test_nowarn LegendMakie.lplot(report_autocal, energies, title = "Test")
             end
