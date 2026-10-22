@@ -41,14 +41,14 @@ module LegendMakieMakieExt
     function LegendMakie.lplot(args...; figsize = Makie.theme(:size), kwargs...)
         # create new Figure
         fig = Makie.Figure(size = figsize)
-        LegendMakie.lplot!(args...; kwargs...)
+        LegendMakie.lplot!(fig, args...; kwargs...)
         fig
     end
 
     function LegendMakie.lhist(args...; figsize = Makie.theme(:size), kwargs...)
         # create new Figure
         fig = Makie.Figure(size = figsize)
-        LegendMakie.lhist!(args...; kwargs...)
+        LegendMakie.lhist!(fig, args...; kwargs...)
         fig
     end
 

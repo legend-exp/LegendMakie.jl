@@ -29,12 +29,11 @@ module LegendMakieRadiationDetectorSignalsExt
 
     # A waveform, or several in one axis, with an entry in the legend for every label given
     function LegendMakie.lplot!(
-            wfs::Union{RadiationDetectorSignals.RDWaveform, AbstractVector{<:RadiationDetectorSignals.RDWaveform}};
+            fig::Makie.Figure, wfs::Union{RadiationDetectorSignals.RDWaveform, AbstractVector{<:RadiationDetectorSignals.RDWaveform}};
             xunit = Makie.Unitful.u"µs", xlabel = "Time ($xunit)", ylabel = "Signal", title::AbstractString = "", titlesize = 18,
             xlims = nothing, ylims = nothing, label = nothing, legend_position = :rt,
             watermark::Bool = true, final::Bool = !isempty(title), kwargs...
         )
-        fig = Makie.current_figure()
         ax = Makie.Axis(fig[1,1],
             dim1_conversion = Makie.UnitfulConversion(xunit, units_in_label = false),
             limits = (xlims, ylims), titlefont = :bold;
@@ -47,7 +46,7 @@ module LegendMakieRadiationDetectorSignalsExt
             waveformplot!(ax, wf; label = l, kwargs...)
         end
         isnothing(label) || legend_position == :none || Makie.axislegend(ax, position = legend_position)
-        watermark && LegendMakie.add_watermarks!(; final)
+        watermark && LegendMakie.add_watermarks!(fig, ax; final)
         fig
     end
 

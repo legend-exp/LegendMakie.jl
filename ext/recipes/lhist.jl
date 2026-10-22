@@ -4,16 +4,16 @@
 _histogram(data, nbins::Union{Integer, Tuple{Vararg{Integer}}}) = StatsBase.fit(StatsBase.Histogram, data; nbins)
 _histogram(data, edges) = StatsBase.fit(StatsBase.Histogram, data, edges)
 
-function LegendMakie.lhist!(values::AbstractVector{<:Real}; bins = 100, kwargs...)
-    LegendMakie.lhist!(_histogram(values, bins); kwargs...)
+function LegendMakie.lhist!(fig::Makie.Figure, values::AbstractVector{<:Real}; bins = 100, kwargs...)
+    LegendMakie.lhist!(fig, _histogram(values, bins); kwargs...)
 end
 
-function LegendMakie.lhist!(x::AbstractVector{<:Real}, y::AbstractVector{<:Real}; bins = 100, kwargs...)
-    LegendMakie.lhist!(_histogram((x, y), bins); kwargs...)
+function LegendMakie.lhist!(fig::Makie.Figure, x::AbstractVector{<:Real}, y::AbstractVector{<:Real}; bins = 100, kwargs...)
+    LegendMakie.lhist!(fig, _histogram((x, y), bins); kwargs...)
 end
 
 function LegendMakie.lhist!(
-    h::StatsBase.Histogram{<:Any, 2};
+    fig::Makie.Figure, h::StatsBase.Histogram{<:Any, 2};
     watermark::Bool = true, rasterize::Bool = false, 
     position::String = "outer top", final::Bool = true,
     colormap = :magma, colorscale = Makie.log10, colorbarlabel = "",
@@ -25,7 +25,6 @@ function LegendMakie.lhist!(
     kwargs...
 )
 
-    fig = Makie.current_figure()
     g = Makie.GridLayout(fig[1,1])
 
     #create plot
@@ -46,14 +45,14 @@ function LegendMakie.lhist!(
     end
 
     # add watermarks
-    Makie.current_axis!(ax)
-    watermark && LegendMakie.add_watermarks!(; position, final, kwargs...)
+    Makie.current_axis!(fig, ax)
+    watermark && LegendMakie.add_watermarks!(fig, ax; position, final, kwargs...)
 
     fig
 end
 
 function LegendMakie.lhist!(
-        h::StatsBase.Histogram{<:Any, 1}; 
+        fig::Makie.Figure, h::StatsBase.Histogram{<:Any, 1};
         title::AbstractString = "", titlesize = 18, titlegap = 2,
         xlabel = "", ylabel = "", label = nothing, yscale = Makie.identity,
         xlims = extrema(first(h.edges)), xscale = Makie.identity,
@@ -64,16 +63,15 @@ function LegendMakie.lhist!(
         watermark::Bool = true, final::Bool = !isempty(title), kwargs...
     )
 
-    fig = Makie.current_figure()
 
     #create plot
-    ax = if isnothing(Makie.current_axis())
+    ax = if isnothing(Makie.current_axis(fig))
         Makie.Axis(fig[1,1],
             limits = (xlims, ylims);
             title, titlesize, titlegap, xlabel, ylabel, xticks, yticks, xscale, yscale
         )
     else
-        Makie.current_axis()
+        Makie.current_axis(fig)
     end
 
 
@@ -82,8 +80,13 @@ function LegendMakie.lhist!(
     if legend_position != :none && !isnothing(label)
         Makie.axislegend(ax, position = legend_position)
     end
-    Makie.current_axis!(ax)
-    watermark && LegendMakie.add_watermarks!(; final, kwargs...)
+    Makie.current_axis!(fig, ax)
+    watermark && LegendMakie.add_watermarks!(fig, ax; final, kwargs...)
 
     fig
+end
+
+# Interactive compatibility boundary.
+function LegendMakie.lhist!(args::Union{StatsBase.Histogram, AbstractVector{<:Real}}...; kwargs...)
+    LegendMakie.lhist!(Makie.current_figure(), args...; kwargs...)
 end

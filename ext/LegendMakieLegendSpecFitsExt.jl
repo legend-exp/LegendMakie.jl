@@ -105,10 +105,10 @@ module LegendMakieLegendSpecFitsExt
         xfit = 0:1:1.2*Measurements.value(maximum(report.x))
         yfit = report.f_fit.(xfit)
         yfit_m = Measurements.value.(yfit)
-        Makie.lines!(xfit, yfit_m, label = "Best Fit" * ((!isempty(report.gof) && p.plot_gof[] && isfinite(report.gof.pvalue)) ? " (p = $(round(report.gof.pvalue, digits=2))| χ²/ndf = $(round(report.gof.chi2min, digits=2)) / $(report.gof.dof))" : ""), color = p.color)
+        Makie.lines!(p, xfit, yfit_m, label = "Best Fit" * ((!isempty(report.gof) && p.plot_gof[] && isfinite(report.gof.pvalue)) ? " (p = $(round(report.gof.pvalue, digits=2))| χ²/ndf = $(round(report.gof.chi2min, digits=2)) / $(report.gof.dof))" : ""), color = p.color)
         if p.plot_ribbon[]
             Δyfit = Measurements.uncertainty.(yfit)
-            Makie.band!(xfit, yfit_m .- Δyfit, yfit_m .+ Δyfit, color = (p.color[], 0.2))
+            Makie.band!(p, xfit, yfit_m .- Δyfit, yfit_m .+ Δyfit, color = (p.color[], 0.2))
         end
         
         # scatter points with error bars
@@ -124,6 +124,7 @@ module LegendMakieLegendSpecFitsExt
 
     # energy calibration plots (calibration function and FWHM)
     function LegendMakie.lplot!(
+            fig::Makie.Figure,
             report::NamedTuple{(:par, :f_fit, :x, :y, :gof)};
             additional_pts::NamedTuple = NamedTuple(),
             title::AbstractString = "", titlesize = 18, 
@@ -135,7 +136,6 @@ module LegendMakieLegendSpecFitsExt
             watermark::Bool = true, final::Bool = !isempty(title), kwargs...
         )
         
-        fig = Makie.current_figure()
             
         g = Makie.GridLayout(fig[row,col])
         ax = Makie.Axis(g[1,1],
@@ -182,24 +182,26 @@ module LegendMakieLegendSpecFitsExt
         end
 
         # add watermarks
-        Makie.current_axis!(ax)
-        watermark && LegendMakie.add_watermarks!(; final, kwargs...)
+        Makie.current_axis!(fig, ax)
+        watermark && LegendMakie.add_watermarks!(fig, ax; final, kwargs...)
 
         fig
     end
 
     # plot report from fit_calibration
     function LegendMakie.lplot!(
+            fig::Makie.Figure,
             report::NamedTuple{(:par, :f_fit, :x, :y, :gof, :e_unit, :type)}; 
             additional_pts::NamedTuple = NamedTuple(), kwargs...
         )
 
         if report.type != :cal
             @warn "Unknown calibration type $(report.type), no plot generated."
-            return Makie.current_figure()
+            return fig
         end
                  
         LegendMakie.lplot!(
+            fig,
             report[(:par, :f_fit, :x, :y, :gof)],
             additional_pts = if !isempty(additional_pts) && !isempty(additional_pts.µ) && !isempty(additional_pts.peaks)
                 # strip the units from the additional points
@@ -218,6 +220,7 @@ module LegendMakieLegendSpecFitsExt
 
     # plot report from fit_fwhm
     function LegendMakie.lplot!(
+            fig::Makie.Figure,
             report::NamedTuple{(:par, :f_fit, :x, :y, :gof, :e_unit, :qbb, :type)};
             additional_pts::NamedTuple = NamedTuple(), xlims = (0,3000), title::AbstractString = "",
             kwargs...
@@ -225,10 +228,11 @@ module LegendMakieLegendSpecFitsExt
         
         if report.type != :fwhm
             @warn "Unknown calibration type $(report.type), no plot generated."
-            return Makie.current_figure()
+            return fig
         end
 
-        fig = LegendMakie.lplot!(
+        LegendMakie.lplot!(
+            fig,
             report[(:par, :f_fit, :x, :y, :gof)],
             additional_pts = if !isempty(additional_pts) && !isempty(additional_pts.peaks) && !isempty(additional_pts.fwhm)
                 fwhm_cal = report.f_fit.(Unitful.ustrip.(additional_pts.peaks))
@@ -241,8 +245,7 @@ module LegendMakieLegendSpecFitsExt
             legend_position = :none; xlims, title, kwargs...
         )
         
-        ax = first(fig.content)
-        Makie.current_axis!(ax)
+        ax = Makie.current_axis(fig)
         qbb = Unitful.ustrip(report.e_unit, Measurements.value(report.qbb))
         Δqbb = Unitful.ustrip(report.e_unit, Measurements.uncertainty(report.qbb))
         Makie.hlines!(ax, [qbb], color = LegendMakie.CoaxGreen, label = LaTeXStrings.latexstring("\\fontfamily{Roboto}Q_{\\beta \\beta}:" * " $(round(Unitful.ustrip(report.e_unit, report.qbb), digits=2))\\;\\text{$(report.e_unit)}"))
@@ -252,9 +255,10 @@ module LegendMakieLegendSpecFitsExt
         fig
     end
 
-    LegendMakie.lplot!(report::NamedTuple{(:peak, :n_before, :n_after, :sf, :before, :after)}; kwargs...) = LegendMakie.lplot!(report.after; kwargs...)
+    LegendMakie.lplot!(fig::Makie.Figure, report::NamedTuple{(:peak, :n_before, :n_after, :sf, :before, :after)}; kwargs...) = LegendMakie.lplot!(fig, report.after; kwargs...)
         
     function LegendMakie.lplot!(
+            fig::Makie.Figure,
             report::NamedTuple{((:survived, :cut, :sf, :bsf))};
             xlims::Tuple{<:Real, <:Real} = extrema(first(report.survived.h.edges)), 
             xticks = (ceil(first(xlims)/10)*10):10:(floor(last(xlims)/10)*10),
@@ -263,7 +267,6 @@ module LegendMakieLegendSpecFitsExt
             sf_in_title::Bool = true, watermark::Bool = true, final::Bool = true, kwargs...
         )
             
-        fig = Makie.current_figure()
         g = Makie.GridLayout(fig[row,col])
         
         if isnothing(ylims)
@@ -290,7 +293,7 @@ module LegendMakieLegendSpecFitsExt
         if !isempty(report.survived.gof) && show_residuals
             ax2 = Makie.Axis(g[2,1], yticks = -3:3:3, limits = (extrema(first(report.survived.h.edges)), (-5,5)), xlabel = xlabel, xticks = xticks, ylabel = "Residuals (σ)")
             LegendMakie.residualplot!(ax2,(x = report.survived.gof.bin_centers, residuals_norm = report.survived.gof.residuals_norm), color = (:black, 0.5))
-            Makie.scatter!(report.cut.gof.bin_centers, report.cut.gof.residuals_norm, color = (:darkgray, 0.7))
+            Makie.scatter!(ax2, report.cut.gof.bin_centers, report.cut.gof.residuals_norm, color = (:darkgray, 0.7))
 
             ax.xticklabelsize = 0
             ax.xticksize = 0
@@ -306,16 +309,17 @@ module LegendMakieLegendSpecFitsExt
             ax2.yticklabelspace = yspace
 
             if row == 1 && watermark
-                Makie.current_axis!(ax)
-                LegendMakie.add_watermarks!(final = true)
+                LegendMakie.add_watermarks!(fig, ax; final = true)
             end
         end
         
+        Makie.current_axis!(fig, ax)
         fig
     end
 
     # SiPM Gaussian Mixture fit
     function LegendMakie.lplot!(
+            fig::Makie.Figure,
             report::NamedTuple{(:h_cal, :f_fit, :f_fit_components, :min_pe, :max_pe, :bin_width, :n_mixtures, :n_pos_mixtures, :peaks, :positions, :μ, :gof)};
             show_peaks::Bool = true, show_residuals::Bool = true, show_components::Bool = true, show_label::Bool = true,
             xlims = extrema(first(report.h_cal.edges)), title::AbstractString = "", titlesize = 18, yscale = Makie.log10,
@@ -325,7 +329,6 @@ module LegendMakieLegendSpecFitsExt
             legend_position = :rt, watermark::Bool = true, final::Bool = !isempty(title), kwargs...
         )
 
-        fig = Makie.current_figure()
 
         # create plot
         g = Makie.GridLayout(fig[row,col])
@@ -335,13 +338,13 @@ module LegendMakieLegendSpecFitsExt
         )
 
         Makie.hist!(ax, StatsBase.midpoints(first(report.h_cal.edges)), weights = report.h_cal.weights, bins = first(report.h_cal.edges), color = LegendMakie.DiamondGrey, label = "Amplitudes", fillto = 1e-2)
-        Makie.lines!(range(extrema(first(report.h_cal.edges))..., length = 1000), x -> report.f_fit(x), linewidth = 2, color = :black, label = ifelse(show_label, "Best Fit" * (!isempty(report.gof) ? " (p = $(round(report.gof.pvalue, digits=2)))" : ""), nothing))
+        Makie.lines!(ax, range(extrema(first(report.h_cal.edges))..., length = 1000), x -> report.f_fit(x), linewidth = 2, color = :black, label = ifelse(show_label, "Best Fit" * (!isempty(report.gof) ? " (p = $(round(report.gof.pvalue, digits=2)))" : ""), nothing))
 
         # show individual components of the Gaussian mixtures
         if show_components
             for i in eachindex(report.μ)
                 f = Base.Fix2(report.f_fit_components, i)
-                Makie.lines!(
+                Makie.lines!(ax,
                     range(extrema(first(report.h_cal.edges))..., length = 1000), 
                     x -> f(x), 
                     #color = report.f_components.colors[component], 
@@ -356,7 +359,7 @@ module LegendMakieLegendSpecFitsExt
         # show peak positions as vlines
         if show_peaks
             for (i, p) in enumerate(report.positions)
-                Makie.vlines!([Measurements.value(p)], label = "$(report.peaks[i]) P.E. [$(report.n_pos_mixtures[i]) Mix.]" * label_errscaling(xerrscaling,1), linewidth = 1.5)
+                Makie.vlines!(ax, [Measurements.value(p)], label = "$(report.peaks[i]) P.E. [$(report.n_pos_mixtures[i]) Mix.]" * label_errscaling(xerrscaling,1), linewidth = 1.5)
                 Makie.band!(ax, [(Measurements.value(p) .+ (-1,1) .* xerrscaling .* Measurements.uncertainty(p))...], ylims..., alpha = 0.5)
             end
         end
@@ -388,14 +391,15 @@ module LegendMakieLegendSpecFitsExt
         legend_position != :none && Makie.axislegend(ax, backgroundcolor = (:white, 0.7), framevisible = true, framecolor = :lightgray, position = legend_position)
 
         # add watermarks
-        Makie.current_axis!(ax)
-        watermark && LegendMakie.add_watermarks!(; final, kwargs...)
+        Makie.current_axis!(fig, ax)
+        watermark && LegendMakie.add_watermarks!(fig, ax; final, kwargs...)
 
         fig
     end
 
     # plot report from filter optimzations, e.g. fit_enc_sigmas, fit_fwhm_ft, fit_sf_wl 
     function LegendMakie.lplot!(
+            fig::Makie.Figure,
             report::NamedTuple{(:x, :minx, :y, :miny)};
             title::AbstractString = "", xunit = Unitful.unit(first(report.x)), yunit = Unitful.unit(first(report.y)),
             xlabel = "", ylabel = "", xlegendlabel = xlabel, ylegendlabel = ylabel, obj = "Min.", xticks = Makie.WilkinsonTicks(6, k_min = 5),  
@@ -404,7 +408,6 @@ module LegendMakieLegendSpecFitsExt
             legend_position = :rt, watermark::Bool = true, final::Bool = !isempty(title), kwargs...
         )
 
-        fig = Makie.current_figure()
 
         ax = Makie.Axis(fig[1,1];
             title, limits = (xlims, ylims), xticks,
@@ -420,34 +423,38 @@ module LegendMakieLegendSpecFitsExt
         
         legend_position != :none && Makie.axislegend(ax, position = legend_position)
 
-        Makie.current_axis!(ax)
-        watermark && LegendMakie.add_watermarks!(; final, kwargs...)
+        Makie.current_axis!(fig, ax)
+        watermark && LegendMakie.add_watermarks!(fig, ax; final, kwargs...)
         fig
     end
 
-    function LegendMakie.lplot!(report::NamedTuple{(:rt, :min_enc, :enc_grid_rt, :enc)}; kwargs...)
+    function LegendMakie.lplot!(fig::Makie.Figure, report::NamedTuple{(:rt, :min_enc, :enc_grid_rt, :enc)}; kwargs...)
         LegendMakie.lplot!(
+            fig,
             (x = report.enc_grid_rt, minx = report.rt, y = report.enc, miny = report.min_enc);
             xlabel = "Rise Time", ylabel = "ENC (ADC)", xlegendlabel = "RT", ylegendlabel = "ENC noise", kwargs...
         )
     end
 
-    function LegendMakie.lplot!(report::NamedTuple{(:ft, :min_fwhm, :e_grid_ft, :fwhm)}; kwargs...)
+    function LegendMakie.lplot!(fig::Makie.Figure, report::NamedTuple{(:ft, :min_fwhm, :e_grid_ft, :fwhm)}; kwargs...)
         LegendMakie.lplot!(
+            fig,
             (x = report.e_grid_ft, minx = report.ft, y = report.fwhm, miny = report.min_fwhm);
             xlabel = "Flat-Top Time", ylabel = "FWHM", xlegendlabel = "FT", ylegendlabel = "FWHM", obj = "Opt.", kwargs...
         )
     end
 
-    function LegendMakie.lplot!(report::NamedTuple{(:wl, :min_sf, :a_grid_wl_sg, :sfs)}; kwargs...)
+    function LegendMakie.lplot!(fig::Makie.Figure, report::NamedTuple{(:wl, :min_sf, :a_grid_wl_sg, :sfs)}; kwargs...)
         LegendMakie.lplot!(
+            fig,
             (x = report.a_grid_wl_sg, minx = report.wl, y = report.sfs, miny = report.min_sf);
             xlabel = "Window length", ylabel = "SEP survival fraction", xlegendlabel = "WL", ylegendlabel = "SF", kwargs...
         )
     end
 
-    function LegendMakie.lplot!(report::NamedTuple{(:wl, :min_obj, :gain, :res_1pe, :pos_1pe, :threshold, :a_grid_wl_sg, :obj, :report_simple, :report_fit)}; kwargs...)
+    function LegendMakie.lplot!(fig::Makie.Figure, report::NamedTuple{(:wl, :min_obj, :gain, :res_1pe, :pos_1pe, :threshold, :a_grid_wl_sg, :obj, :report_simple, :report_fit)}; kwargs...)
         LegendMakie.lplot!(
+            fig,
             (x = report.a_grid_wl_sg, minx = report.wl, y = report.obj, miny = report.min_obj);
             xlabel = "Window length",
             ylabel = LaTeXStrings.latexstring("\\fontfamily{Roboto} Objective\\; \$\\frac{\\sqrt{\\sigma \\cdot \\text{threshold}}}{\\text{gain}}\$"), 
@@ -457,6 +464,7 @@ module LegendMakieLegendSpecFitsExt
 
     # plot report from singlefits, e.g. fit_single_trunc_gauss
     function LegendMakie.lplot!(
+            fig::Makie.Figure,
             report::NamedTuple{(:f_fit, :h, :μ, :σ, :gof)};
             title::AbstractString = "", titlesize = 18, 
             show_residuals::Bool = true, row::Int = 1, col::Int = 1,
@@ -466,7 +474,6 @@ module LegendMakieLegendSpecFitsExt
             legend_position = :lt, watermark::Bool = true, final::Bool = !isempty(title), kwargs...
         )
 
-        fig = Makie.current_figure()
         
         g = Makie.GridLayout(fig[row,col])
         ax = Makie.Axis(g[1,1], 
@@ -478,7 +485,7 @@ module LegendMakieLegendSpecFitsExt
         Makie.plot!(ax, report.h, label = "Data")
         
         _x = range(extrema(xlims)..., length = 1000)
-        Makie.lines!(_x, report.f_fit.(_x), color = :red, 
+        Makie.lines!(ax, _x, report.f_fit.(_x), color = :red,
             label = "Normal Fit\nμ = $(round_wo_units(report.μ; digits))\nσ = $(round_wo_units(report.σ; digits))")
         
         if legend_position != :none 
@@ -506,29 +513,25 @@ module LegendMakieLegendSpecFitsExt
         end
 
         # add watermarks
-        Makie.current_axis!(ax)
-        watermark && LegendMakie.add_watermarks!(; final, kwargs...)
+        Makie.current_axis!(fig, ax)
+        watermark && LegendMakie.add_watermarks!(fig, ax; final, kwargs...)
         
         fig
     end
 
     # plot QC cut window fits
-    function LegendMakie.lplot!(report::NamedTuple{(:f_fit, :h, :μ, :σ, :gof, :low_cut, :high_cut)}; show_residuals::Bool = true, legend_position = :lt, kwargs...)
+    function LegendMakie.lplot!(fig::Makie.Figure, report::NamedTuple{(:f_fit, :h, :μ, :σ, :gof, :low_cut, :high_cut)}; show_residuals::Bool = true, legend_position = :lt, kwargs...)
         n_σ = round_wo_units(Measurements.value((report.µ - report.low_cut) / report.σ), digits=1)
         # plot simpel gaussian fit
-        fig = LegendMakie.lplot!(
+        LegendMakie.lplot!(
+            fig,
             NamedTuple{(:f_fit, :h, :μ, :σ, :gof)}(report); 
             xlims = Unitful.ustrip.(Measurements.value.((report.μ - 2.5*n_σ*report.σ, report.μ + 1.5*n_σ*report.σ))),
             legend_position=:none, show_residuals = show_residuals,
             kwargs...)
         
         # get axis and plot the cut window
-        ax = if !isempty(report.gof) && show_residuals
-            fig.content[end-1]
-        else
-            fig.content[end]
-        end
-        Makie.current_axis!(ax)
+        ax = Makie.current_axis(fig)
 
         Makie.vspan!(ax, Unitful.ustrip.(Measurements.value.((report.low_cut, report.high_cut)))..., color=LegendMakie.CoaxGreen, alpha=0.05, label=nothing)
         Makie.vlines!(ax, Unitful.ustrip.(Measurements.value.([report.low_cut, report.high_cut])), linewidth=2.5, color=LegendMakie.CoaxGreen, label="$(n_σ)σ cut window")
@@ -540,6 +543,7 @@ module LegendMakieLegendSpecFitsExt
 
     # plot reports from fit_peaks
     function LegendMakie.lplot!(
+            fig::Makie.Figure,
             report::NamedTuple{(:v, :h, :f_fit, :f_components, :gof)};
             xunit = u"keV", xlabel = "Energy ($xunit)", ylabel = "Counts / $(round(step(first(report.h.edges)), digits = 2)) $xunit",
             title::AbstractString = "", titlesize = 18, legend_position = :split,
@@ -559,7 +563,6 @@ module LegendMakieLegendSpecFitsExt
         )
 
         
-        fig = Makie.current_figure()
 
         # create plot
         g = Makie.GridLayout(fig[row,col])
@@ -569,7 +572,7 @@ module LegendMakieLegendSpecFitsExt
         )
 
         data = Makie.hist!(ax, StatsBase.midpoints(first(report.h.edges)), weights = report.h.weights, bins = first(report.h.edges), color = LegendMakie.DiamondGrey, fillto = 0.5*(ylims[1]))
-        fit = Makie.lines!(range(extrema(first(report.h.edges))..., length = 1000), x -> Measurements.value(report.f_fit(x)) * step(first(report.h.edges)), color = :black)
+        fit = Makie.lines!(ax, range(extrema(first(report.h.edges))..., length = 1000), x -> Measurements.value(report.f_fit(x)) * step(first(report.h.edges)), color = :black)
         
         data_plots = show_label ? [data, fit] : [data]
         data_labels = show_label ? ["Data", "Best Fit" * (!isempty(report.gof) ? " (p = $(round(report.gof.pvalue, digits=2)))" : "")] : ["Data"]
@@ -580,7 +583,7 @@ module LegendMakieLegendSpecFitsExt
         if show_components
             component_labels, component_lines = [], []
             for (idx, component) in enumerate(keys(report.f_components.funcs))
-                comp = Makie.lines!(
+                comp = Makie.lines!(ax,
                     range(extrema(first(report.h.edges))..., length = 1000), 
                     x -> report.f_components.funcs[component](x) * step(first(report.h.edges)), 
                     color = report.f_components.colors[component], 
@@ -623,14 +626,15 @@ module LegendMakieLegendSpecFitsExt
         end
 
         # add watermarks
-        Makie.current_axis!(ax)
-        watermark && LegendMakie.add_watermarks!(; final, kwargs...)
+        Makie.current_axis!(fig, ax)
+        watermark && LegendMakie.add_watermarks!(fig, ax; final, kwargs...)
 
         fig
     end
 
     # Ecal
     function LegendMakie.lplot!(
+            fig::Makie.Figure,
             report::NamedTuple{(:f_calib, :h_cal, :h_uncal, :c, :peak_positions, :threshold)},
             cal_lines::Vector{<:Unitful.Energy} = typeof(1.0u"keV")[];
             e_unit = u"keV", e_label = "e_fc", lines_label = Makie.rich(Makie.superscript("228"), "Th Calibration Lines"),
@@ -645,20 +649,20 @@ module LegendMakieLegendSpecFitsExt
         ylims = isnothing(ylims) ? (0.9, maximum(h_cal.weights)*1.2) : ylims
 
         # create figure
-        fig = Makie.current_figure()
         ax = Makie.Axis(fig[1,1]; limits = (xlims, ylims), title, xticks, xlabel, ylabel, yscale)
 
         Makie.stephist!(ax, StatsBase.midpoints(first(h_cal.edges)), weights = replace(h_cal.weights, 0=>1e-10), bins = first(h_cal.edges), label = e_label)
         !isempty(cal_lines) && Makie.vlines!(ax, Unitful.ustrip.(e_unit, cal_lines), color = :red, label = lines_label)
         legend_position != :none && Makie.axislegend(ax, position = legend_position, framevisible = true, framecolor = :lightgray)
             
-        Makie.current_axis!(ax)
-        watermark && LegendMakie.add_watermarks!(; final, kwargs...)
+        Makie.current_axis!(fig, ax)
+        watermark && LegendMakie.add_watermarks!(fig, ax; final, kwargs...)
         fig
     end
 
     # plot report from simple_calibration
     function LegendMakie.lplot!(
+            fig::Makie.Figure,
             report::NamedTuple{(:h_calsimple, :h_uncal, :c, :peak_guess, :peakhists, :peakstats)};
             cal::Bool = true, title::AbstractString = "", titlegap = 2, titlesize = 18, label = "Energy",
             xlims = (0, cal ? 3000 : 1.2*report.peak_guess), xlabel = "Energy ($(cal ? "keV" : "ADC"))", 
@@ -674,7 +678,6 @@ module LegendMakieLegendSpecFitsExt
         ylabel = isnothing(ylabel) ? "Counts / $(round(step(first(h.edges)), digits = 2)) $(cal ? "keV" : "ADC")" : ylabel
 
         # create figure
-        fig = Makie.current_figure()
         
         # select correct histogram
         peak_guess = cal ? Unitful.ustrip(report.c * report.peak_guess) : report.peak_guess
@@ -692,14 +695,15 @@ module LegendMakieLegendSpecFitsExt
         Makie.axislegend(ax, position = :ct)
         
         # add watermarks
-        Makie.current_axis!(ax)
-        watermark && LegendMakie.add_watermarks!(; final, kwargs...)
+        Makie.current_axis!(fig, ax)
+        watermark && LegendMakie.add_watermarks!(fig, ax; final, kwargs...)
         
         fig
     end
 
     # plot report from fit_aoe_corrections
     function LegendMakie.lplot!( 
+            fig::Makie.Figure,
             report::NamedTuple{(:par, :f_fit, :x, :y, :gof, :e_unit, :label_y, :label_fit)}; 
             title::AbstractString = "", titlesize = 18, show_residuals::Bool = true,
             xticks = 500:250:2250, xlims = (500,2300), ylims = nothing,
@@ -707,7 +711,6 @@ module LegendMakieLegendSpecFitsExt
             watermark::Bool = true, final::Bool = !isempty(title), kwargs...
         )
 
-        fig = Makie.current_figure()
 
         # create plot
         g = Makie.GridLayout(fig[row,col])
@@ -747,23 +750,23 @@ module LegendMakieLegendSpecFitsExt
         end
 
         # add watermarks
-        Makie.current_axis!(ax)
-        watermark && LegendMakie.add_watermarks!(; final, kwargs...)
+        Makie.current_axis!(fig, ax)
+        watermark && LegendMakie.add_watermarks!(fig, ax; final, kwargs...)
 
         fig 
     end
 
     # plot report fit_aoe_compton_combined
     function LegendMakie.lplot!( 
+            fig::Makie.Figure,
             report::NamedTuple{(:par, :f_fit, :x, :y, :gof, :e_unit, :label_y, :label_fit)},
             com_report::NamedTuple{(:values, :label_y, :label_fit, :energy)};
             legend_position = :rt, row::Int = 1, col::Int = 1, kwargs...
         )
 
-        fig = LegendMakie.lplot!(report, legend_position = :none, col = col; kwargs...)
+        LegendMakie.lplot!(fig, report, legend_position = :none, row = row, col = col; kwargs...)
 
-        g = last(Makie.contents(fig[row,col]))
-        ax = Makie.contents(g)[1]
+        ax = Makie.current_axis(fig)
         Makie.lines!(ax, com_report.energy, com_report.values, linewidth = 4, color = :red, linestyle = :dash, label = LaTeXStrings.latexstring("\\fontfamily{Roboto}" * com_report.label_fit))
         Makie.axislegend(ax, position = legend_position, framevisible = true, framecolor = :lightgray, backgroundcolor = :white)
 
@@ -772,11 +775,11 @@ module LegendMakieLegendSpecFitsExt
 
 
     function LegendMakie.lplot!( 
+            fig::Makie.Figure,
             report::NamedTuple{(:h_before, :h_after_low, :h_after_ds, :dep_h_before, :dep_h_after_low, :dep_h_after_ds, :sf, :n0, :lowcut, :highcut, :e_unit, :bin_width)}; 
             title::AbstractString = "", watermark::Bool = true, final::Bool = true, kwargs...
         )
 
-        fig = Makie.current_figure()
 
         # create main histogram plot
         ax = Makie.Axis(fig[1,1],
@@ -810,8 +813,8 @@ module LegendMakieLegendSpecFitsExt
         Makie.stephist!(ax_inset, StatsBase.midpoints(first(report.dep_h_after_ds.edges)),  weights = replace(report.dep_h_after_ds.weights, 0 => 1e-10),  bins = first(report.dep_h_after_ds.edges),  color = (LegendMakie.CoaxGreen, 0.5))
 
         # add watermarks
-        Makie.current_axis!(ax)
-        watermark && LegendMakie.add_watermarks!(; final, kwargs...)
+        Makie.current_axis!(fig, ax)
+        watermark && LegendMakie.add_watermarks!(fig, ax; final, kwargs...)
 
         fig
     end
@@ -819,6 +822,7 @@ module LegendMakieLegendSpecFitsExt
 
     # plot report from ctc_energy
     function LegendMakie.lplot!(
+            fig::Makie.Figure,
             report::NamedTuple{(:peak, :window, :fct, :bin_width, :bin_width_qdrift, :e_peak, :e_ctc, :qdrift_peak, :h_before, :h_after, :fwhm_before, :fwhm_after, :report_before, :report_after)};
             title::AbstractString = "", titlesize = 18, titlegap = 0, e_unit = u"keV", 
             label_before = "Before correction", label_after = "After correction",  
@@ -829,7 +833,6 @@ module LegendMakieLegendSpecFitsExt
         )
 
         # Best results for figsize (600,600)
-        fig = Makie.current_figure()
 
         g = Makie.GridLayout(fig[1,1])
 
@@ -878,8 +881,8 @@ module LegendMakieLegendSpecFitsExt
         end
 
         # add watermarks
-        Makie.current_axis!(ax3)
-        watermark && LegendMakie.add_watermarks!(; kwargs...)
+        Makie.current_axis!(fig, ax3)
+        watermark && LegendMakie.add_watermarks!(fig, ax3; kwargs...)
 
         fig
     end
@@ -887,6 +890,7 @@ module LegendMakieLegendSpecFitsExt
 
     # plot report from ctc_aoe
     function LegendMakie.lplot!( 
+            fig::Makie.Figure,
             report::NamedTuple{(:peak, :window, :fct, :bin_width, :bin_width_qdrift, :aoe_peak, :aoe_ctc, :aoe_ctc_norm, :qdrift_peak, :h_before, :h_after, :h_after_norm, :σ_before, :σ_after, :σ_after_norm, :report_before, :report_after, :report_after_norm)};
             label_before = "Before correction", label_after = "After correction", levels = 15,
             xlims = (-9,5), ylims = StatsBase.quantile.(Ref(report.qdrift_peak), (0.005, 0.995)), xticks = Makie.WilkinsonTicks(6,k_min=5), yticks = Makie.WilkinsonTicks(6,k_min=4),
@@ -896,7 +900,6 @@ module LegendMakieLegendSpecFitsExt
         )
 
         # Best results for figsize (600,600)
-        fig = Makie.current_figure()
         
         g = Makie.GridLayout(fig[1,1])
         
@@ -945,8 +948,8 @@ module LegendMakieLegendSpecFitsExt
         end
         
         # add watermarks
-        Makie.current_axis!(ax3)
-        watermark && LegendMakie.add_watermarks!(; kwargs...)
+        Makie.current_axis!(fig, ax3)
+        watermark && LegendMakie.add_watermarks!(fig, ax3; kwargs...)
         
         fig
     end
@@ -954,6 +957,7 @@ module LegendMakieLegendSpecFitsExt
 
     # LQ plots
     function LegendMakie.lplot!(
+            fig::Makie.Figure,
             report::NamedTuple{(:hist_dep, :hist_sb1, :hist_sb2, :hist_subtracted, :hist_corrected)};
             title::AbstractString = "", titlesize = 18, titlegap = 2, legend_position = :rt, 
             xlabel = Makie.rich("LQ", Makie.subscript(" ctc")), 
@@ -964,7 +968,6 @@ module LegendMakieLegendSpecFitsExt
         )
     
         
-        fig = Makie.current_figure()
         ax = Makie.Axis(fig[1,1]; limits = (xlims, ylims), title, titlesize, titlegap, xlabel, ylabel, xticks, yscale)
         
         let h = report.hist_dep, h1 = report.hist_sb1, h2 = report.hist_sb2
@@ -973,13 +976,15 @@ module LegendMakieLegendSpecFitsExt
         Makie.stephist!(ax, first(h2.edges) .- step(first(h2.edges))/2, bins = [first(first(h1.edges))-step(first(h1.edges)); first(h1.edges)], weights = replace([0.; h2.weights], 0 => 1e-10), label = "Sideband 2")
         end
         
-        legend_position != :none && Makie.axislegend(position = legend_position)
+        legend_position != :none && Makie.axislegend(ax, position = legend_position)
         
-        watermark && LegendMakie.add_watermarks!(; final, kwargs...)
+        Makie.current_axis!(fig, ax)
+        watermark && LegendMakie.add_watermarks!(fig, ax; final, kwargs...)
         fig
     end
 
     function LegendMakie.lplot!(
+            fig::Makie.Figure,
             report::NamedTuple{(:e_cal, :lq_class, :cut_value)};
             title::AbstractString = "", e_unit = Unitful.unit(first(report.e_cal)), 
             xlabel = "Energy ($e_unit)", ylabel = "Counts", yscale = Makie.log10,
@@ -987,7 +992,6 @@ module LegendMakieLegendSpecFitsExt
         )
         
         # best results for figsize = (750,400)
-        fig = Makie.current_figure()
         
         h = StatsBase.fit(StatsBase.Histogram, Unitful.ustrip.(e_unit, report.e_cal), 0:1:3000)
         ax = Makie.Axis(fig[1,1],
@@ -1022,13 +1026,14 @@ module LegendMakieLegendSpecFitsExt
         Makie.stephist!(ax_inset, Unitful.ustrip.(e_unit, report.e_cal)[report.lq_class .> report.cut_value],  bins = 1583:0.5:1640, color = (LegendMakie.BEGeOrange, 1.0),  label = "Before A/E")
         Makie.stephist!(ax_inset, Unitful.ustrip.(e_unit, report.e_cal)[report.lq_class .<= report.cut_value], bins = 1583:0.5:1640, color = (LegendMakie.CoaxGreen, 0.7),  label = "Before A/E")
 
-        Makie.current_axis!(ax)
-        watermark && LegendMakie.add_watermarks!(final = true)
+        Makie.current_axis!(fig, ax)
+        watermark && LegendMakie.add_watermarks!(fig, ax; final = true)
         
         fig
     end
 
     function LegendMakie.lplot!(
+            fig::Makie.Figure,
             report::NamedTuple{(:e_cal, :edges, :dep_σ)};
             e_unit = Unitful.unit(first(report.e_cal)), 
             title::AbstractString = "", titlesize = 18, titlegap = 2,
@@ -1038,7 +1043,6 @@ module LegendMakieLegendSpecFitsExt
             legend_position = :lt, watermark::Bool = true, final::Bool = !isempty(title), kwargs...
         )
         
-        fig = Makie.current_figure()
         
         ax = Makie.Axis(fig[1,1], limits = (xlims, ylims); title, titlesize, titlegap, xlabel, ylabel, xticks)
         
@@ -1055,13 +1059,14 @@ module LegendMakieLegendSpecFitsExt
         
         legend_position != :none && Makie.axislegend(ax, position = legend_position)
         
-        Makie.current_axis!(ax)
-        watermark && LegendMakie.add_watermarks!(; final, kwargs...)
+        Makie.current_axis!(fig, ax)
+        watermark && LegendMakie.add_watermarks!(fig, ax; final, kwargs...)
         
         fig
     end
 
     function LegendMakie.lplot!(
+            fig::Makie.Figure,
             report::NamedTuple{(:lq_report, :drift_report, :lq_box, :drift_time_func, :dep_left, :dep_right)},
             e_cal, dt_eff, lq_e_corr, plot_type::Symbol = :whole;
             title::AbstractString = "", xlabel = "Qdrift/E (a.u.)", ylabel = "LQ/E (a.u.)", 
@@ -1074,16 +1079,18 @@ module LegendMakieLegendSpecFitsExt
         let l = report.lq_box.t_lower, r = report.lq_box.t_upper, b = report.lq_box.lq_lower, t = report.lq_box.lq_upper
             xlims = (2l-r, 2r-l)
             ylims = plot_type == :whole ? (9b-8t, 9t-8b) : (2b-t, 5t-4b)
-            LegendMakie.lhist!(StatsBase.fit(StatsBase.Histogram, (dt_eff[sel], lq_e_corr[sel]), 
+            LegendMakie.lhist!(fig, StatsBase.fit(StatsBase.Histogram, (dt_eff[sel], lq_e_corr[sel]),
                 (range(xlims..., length = (plot_type == :whole ? 200 : 50)), range(ylims..., length = (plot_type == :whole ? 200 : 50))));
                 title, xlabel, ylabel, limits = (xlims, ylims), colorscale,
                 colormap = :viridis, figsize = (620,400), watermark = false)
-            Makie.lines!([l,l,r,r,l],[b,t,t,b,b], color = :red, linewidth = 3)
-            Makie.lines!([2l-r,2r-l], report.drift_time_func.([2l-r,2r-l]), linewidth = 3, 
+            ax = Makie.current_axis(fig)
+            Makie.lines!(ax, [l,l,r,r,l],[b,t,t,b,b], color = :red, linewidth = 3)
+            Makie.lines!(ax, [2l-r,2r-l], report.drift_time_func.([2l-r,2r-l]), linewidth = 3,
                 color = LegendMakie.BEGeOrange, label = "Best Fit")
+            Makie.axislegend(ax, position = :lt, framevisible = plot_type == :whole, framewidth = 1, framecolor = :lightgray)
+            watermark && LegendMakie.add_watermarks!(fig, ax; position = "outer top", final, kwargs...)
         end
-        Makie.axislegend(position = :lt, framevisible = plot_type == :whole, framewidth = 1, framecolor = :lightgray)
-        LegendMakie.add_watermarks!(; position = "outer top", final, kwargs...)
+        fig
     end
 
 
@@ -1098,6 +1105,7 @@ module LegendMakieLegendSpecFitsExt
 
     # plot report of sipm_simple_calibration (needs the extended report of LegendSpecFits > 0.4.6)
     function LegendMakie.lplot!(
+            fig::Makie.Figure,
             report::NamedTuple{(:peakpos, :peakpos_cal, :h_uncal, :h_calsimple, :h_uncal_full, :h_calsimple_full, :noise_threshold, :noise_threshold_cal, :valley_found)};
             cal::Bool = true, title::AbstractString = "", titlesize = 18, titlegap = 2,
             h = _sipm_composite_hist(report, cal),
@@ -1110,8 +1118,8 @@ module LegendMakieLegendSpecFitsExt
         )
 
         # create histogram
-        fig = LegendMakie.lplot!(h; limits = (xlims, ylims), title, titlesize, titlegap, xticks, xlabel, ylabel, yscale, label, legend_position = :none, kwargs...)
-        ax = Makie.current_axis()
+        LegendMakie.lplot!(fig, h; limits = (xlims, ylims), title, titlesize, titlegap, xticks, xlabel, ylabel, yscale, label, legend_position = :none, kwargs...)
+        ax = Makie.current_axis(fig)
     
         # add peak positions and the noise cut with its value in the legend
         Makie.vlines!(ax, cal ? report.peakpos_cal : report.peakpos, color = :red, label = peak_label, linewidth = 1.5)
@@ -1121,8 +1129,8 @@ module LegendMakieLegendSpecFitsExt
         legend_position != :none && Makie.axislegend(ax, framevisible = true, framewidth = 0, position = legend_position)
 
         # add watermarks
-        Makie.current_axis!(ax)
-        watermark && LegendMakie.add_watermarks!(; final, kwargs...)
+        Makie.current_axis!(fig, ax)
+        watermark && LegendMakie.add_watermarks!(fig, ax; final, kwargs...)
 
         fig
     end
@@ -1130,16 +1138,18 @@ module LegendMakieLegendSpecFitsExt
 
     # Dict of reports (vertical alignment)
     function LegendMakie.lplot!(
+            fig::Makie.Figure,
             reports::AbstractDict{<:Any, NamedTuple}; title::AbstractString = "", 
             watermark::Bool = true, final::Bool = true, titlesize = 20, subplot_titlesize = 18, kwargs...
         )
 
-        fig = Makie.current_figure()
 
         isempty(reports) && throw(ArgumentError("Cannot plot empty dictionary."))
         
+        ax = nothing
         for (i,(k,report)) in enumerate(reports)
-            LegendMakie.lplot!(report, title = string(k), titlesize = subplot_titlesize, row = i, watermark = false; kwargs...)
+            LegendMakie.lplot!(fig, report, title = string(k), titlesize = subplot_titlesize, row = i, watermark = false; kwargs...)
+            i == 1 && (ax = Makie.current_axis(fig))
         end
 
         # add general title
@@ -1148,8 +1158,8 @@ module LegendMakieLegendSpecFitsExt
         end
 
         # add watermarks
-        Makie.current_axis!(first(fig.content))
-        watermark && LegendMakie.add_watermarks!(; final, kwargs...)
+        Makie.current_axis!(fig, ax)
+        watermark && LegendMakie.add_watermarks!(fig, ax; final, kwargs...)
 
         fig
     end
