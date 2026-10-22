@@ -22,6 +22,9 @@ module LegendMakieLegendDataManagementExt
 
     Makie.@recipe(ParameterPlot, chinfo, pars, properties) do scene
         Makie.Attributes(
+            axis_labels = Makie.RichText[],
+            axis_xlabel = "",
+            axis_ylabel = "",
             xlabel = "Detector",
             ylabel = missing,
 	    label = nothing,
@@ -97,9 +100,27 @@ module LegendMakieLegendDataManagementExt
         Makie.vlines!(p, vlines .- 1, color = :black)
         status_colors && !isempty(missing_xvalues) && Makie.vlines!(p, missing_xvalues, color = :red, linewidth = 0.75)
 
-        ax = Makie.current_axis()
-        ax.xlabel = status_colors ? "$(p.xlabel[]) (ON: black, AC: yellow, OFF: red; no data: thin red line)" : p.xlabel[]
-        ax.ylabel = ylabel
+        p.axis_labels[] = labels
+        p.axis_xlabel[] = status_colors ? "$(p.xlabel[]) (ON: black, AC: yellow, OFF: red; no data: thin red line)" : p.xlabel[]
+        p.axis_ylabel[] = ylabel
+
+        p
+    end
+
+    # Implicit plotting is retained for interactive use only.
+    function LegendMakie.parameterplot!(chinfo::TypedTables.Table, pars::PropDicts.PropDict, properties::AbstractVector{Symbol} = Symbol[]; kwargs...)
+        LegendMakie.parameterplot!(Makie.current_axis(), chinfo, pars, properties; kwargs...)
+    end
+
+    function LegendMakie.parameterplot!(position::Union{Makie.GridPosition, Makie.GridSubposition}, chinfo::TypedTables.Table, pars::PropDicts.PropDict, properties::AbstractVector{Symbol} = Symbol[]; kwargs...)
+        LegendMakie.parameterplot!(only(Makie.contents(position; exact = true)), chinfo, pars, properties; kwargs...)
+    end
+
+    function LegendMakie.parameterplot!(ax::Makie.Axis, chinfo::TypedTables.Table, pars::PropDicts.PropDict, properties::AbstractVector{Symbol} = Symbol[]; kwargs...)
+        p = invoke(parameterplot!, Tuple{Vararg{Any}}, ax, chinfo, pars, properties; kwargs...)
+        labels = p.axis_labels[]
+        ax.xlabel = p.axis_xlabel[]
+        ax.ylabel = p.axis_ylabel[]
         ax.xticks = (eachindex(labels) .- 1, labels)
         ax.xticklabelrotation = π/2
         ax.xgridvisible = true
@@ -110,18 +131,17 @@ module LegendMakieLegendDataManagementExt
     end
 
     function LegendMakie.lplot!(
-            chinfo::TypedTables.Table, pars::PropDicts.PropDict, properties::AbstractVector{Symbol} = Symbol[];
+            fig::Makie.Figure, chinfo::TypedTables.Table, pars::PropDicts.PropDict, properties::AbstractVector{Symbol} = Symbol[];
             watermark::Bool = true, kwargs...
         )
-
-        fig = Makie.current_figure()
 
         # create plot
         ax = Makie.Axis(fig[1,1])
         LegendMakie.parameterplot!(ax, chinfo, pars, properties; kwargs...)
 
         # add watermarks
-        watermark && LegendMakie.add_watermarks!(; kwargs...)
+        Makie.current_axis!(fig, ax)
+        watermark && LegendMakie.add_watermarks!(fig, ax; kwargs...)
 
         fig
     end
@@ -327,7 +347,7 @@ module LegendMakieLegendDataManagementExt
     end
 
     function LegendMakie.lplot!(
-            data::LegendDataManagement.LegendData, fk::LegendDataManagement.FileKey, ts::Unitful.Time{<:Real}, det::LegendDataManagement.DetectorIdLike; 
+            fig::Makie.Figure, data::LegendDataManagement.LegendData, fk::LegendDataManagement.FileKey, ts::Unitful.Time{<:Real}, det::LegendDataManagement.DetectorIdLike;
             plot_tier = LegendDataManagement.DataTier(:raw), plot_waveform = [:waveform_presummed], subtract_baseline::Bool = true,
             show_unixtime = false, xunit::Unitful.Units = u"µs", 
             xlims = nothing, show_title::Bool = true, show_label::Bool = true, watermark::Bool = true, final::Bool = true, kwargs...
@@ -338,8 +358,6 @@ module LegendMakieLegendDataManagementExt
         raw = LegendDataManagement.read_ldata(_event_columns(plot_waveform, subtract_baseline), data, plot_tier, fk, [ts], det)
         
         # best results for figure size (800,400)
-        fig = Makie.current_figure()
-        
         g = Makie.GridLayout(fig[1,1])
         ax = Makie.Axis(g[1,1], 
             dim1_conversion = Makie.UnitfulConversion(xunit, units_in_label=false),
@@ -366,13 +384,13 @@ module LegendMakieLegendDataManagementExt
         show_title && Makie.Label(g[1,:,Makie.Top()], "$(fk.setup)-$(fk.period)-$(fk.run)-$(fk.category)", padding = (0,0,36,0), fontsize = 24, font = :bold)
 
         # add watermarks
-        Makie.current_axis!(ax)
-        watermark && LegendMakie.add_watermarks!(; final, kwargs...)
+        Makie.current_axis!(fig, ax)
+        watermark && LegendMakie.add_watermarks!(fig, ax; final, kwargs...)
 
         fig
     end
 
-    function LegendMakie.lplot!(data::LegendDataManagement.LegendData, ts::Unitful.Time;
+    function LegendMakie.lplot!(fig::Makie.Figure, data::LegendDataManagement.LegendData, ts::Unitful.Time;
             system = [:geds, :spms], only_processable::Bool = true, filterby = nothing, group = nothing,
             color::Symbol = isnothing(group) || group === false ? :amplitude : :group,
             exploded::Bool = false, ncols::Int = 3, plot_tier = LegendDataManagement.DataTier(:raw),
@@ -406,15 +424,14 @@ module LegendMakieLegendDataManagementExt
             chinfo_det.system != :geds && throw(ArgumentError("Only HPGe cal events are supported"))
             only_processable && !chinfo_det.processable && throw(ArgumentError("Detector $det is not processable"))
 
-            fig = LegendMakie.lplot!(data, fk, ts, det; plot_waveform = system[:geds], plot_tier, subtract_baseline, show_unixtime, watermark = false, xlims, kwargs...)
-            watermark && LegendMakie.add_watermarks!(; final, kwargs...)
+            LegendMakie.lplot!(fig, data, fk, ts, det; plot_waveform = system[:geds], plot_tier, subtract_baseline, show_unixtime, watermark = false, xlims, kwargs...)
+            watermark && LegendMakie.add_watermarks!(fig, Makie.current_axis(fig); final, kwargs...)
 
             fig
 
         elseif fk.category == LegendDataManagement.DataCategory(:phy)
             panels = _event_panels(data, fk, ts, system; only_processable, filterby, group, color, exploded, plot_tier, subtract_baseline)
 
-            fig = Makie.current_figure()
             g = Makie.GridLayout(fig[1,1])
             axs, watermark_ax = _draw_event_panels!(g, panels; exploded, ncols, xlims, xunit)
 
@@ -422,34 +439,34 @@ module LegendMakieLegendDataManagementExt
             show_title && Makie.Label(g[1,:,Makie.Top()], show_unixtime ? Makie.rich("$runkey - ", _event_time(ts; fontsize = 16)) : runkey,
                 padding = (0,0,36,0), fontsize = 24, font = :bold)
 
-            Makie.current_axis!(watermark_ax)
-            watermark && LegendMakie.add_watermarks!(; final, kwargs...)
+            Makie.current_axis!(fig, watermark_ax)
+            watermark && LegendMakie.add_watermarks!(fig, watermark_ax; final, kwargs...)
 
             fig
         end
     end
 
 
-    function LegendMakie.lplot!(data::LegendDataManagement.LegendData, ts::Unitful.Time{<:Real}, det::LegendDataManagement.DetectorIdLike; kwargs...)
+    function LegendMakie.lplot!(fig::Makie.Figure, data::LegendDataManagement.LegendData, ts::Unitful.Time{<:Real}, det::LegendDataManagement.DetectorIdLike; kwargs...)
         fk = LegendDataManagement.find_filekey(data, ts)
         det = LegendDataManagement.DetectorId(det)  # convert to DetectorId if necessary
-        LegendMakie.lplot!(data, fk, ts, det; kwargs...)
+        LegendMakie.lplot!(fig, data, fk, ts, det; kwargs...)
     end
 
     # TODO: check rounding of `Dates.DateTime`
-    function LegendMakie.lplot!(data::LegendDataManagement.LegendData, ts::Dates.DateTime, args...; kwargs...)
-        LegendMakie.lplot!(data, Dates.datetime2unix(ts)*u"s", args...; kwargs...)
+    function LegendMakie.lplot!(fig::Makie.Figure, data::LegendDataManagement.LegendData, ts::Dates.DateTime, args...; kwargs...)
+        LegendMakie.lplot!(fig, data, Dates.datetime2unix(ts)*u"s", args...; kwargs...)
     end
 
     # the event plots have their own default figure sizes
     function LegendMakie.lplot(data::LegendDataManagement.LegendData, ts::Union{Unitful.Time, Dates.DateTime}; exploded::Bool = false, figsize = exploded ? (1200, 900) : (800, 600), kwargs...)
         fig = Makie.Figure(size = figsize)
-        LegendMakie.lplot!(data, ts; exploded, kwargs...)
+        LegendMakie.lplot!(fig, data, ts; exploded, kwargs...)
         fig
     end
     function LegendMakie.lplot(data::LegendDataManagement.LegendData, ts::Union{Unitful.Time, Dates.DateTime}, det::LegendDataManagement.DetectorIdLike; figsize = (800, 400), kwargs...)
         fig = Makie.Figure(size = figsize)
-        LegendMakie.lplot!(data, ts, det; kwargs...)
+        LegendMakie.lplot!(fig, data, ts, det; kwargs...)
         fig
     end
 

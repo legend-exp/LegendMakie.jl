@@ -16,12 +16,12 @@ dplms_t0(superpulse, t50) = (t = Unitful.ustrip.(u"µs", superpulse.time); t[arg
 
 # superpulse, window reference and per-drift-bin references
 function LegendMakie.lplot!(
+        fig::Makie.Figure,
         report::NamedTuple{(:superpulse, :ref, :ref_bins, :t50, :t_pickoff, :n_pre, :n_post)};
         plateau_length::Integer = 20, title::AbstractString = "", titlesize = 18, titlegap = 0,
         xlims = nothing, legend_position = :rb, bin_legend_position = :lt, row::Int = 1, col::Int = 1,
         watermark::Bool = true, final::Bool = !isempty(title), kwargs...
     )
-    fig = Makie.current_figure()
     Δt = Unitful.ustrip(u"µs", step(report.superpulse.time))
     t_sp = Unitful.ustrip.(u"µs", report.superpulse.time)
     t0 = dplms_t0(report.superpulse, report.t50)
@@ -54,19 +54,19 @@ function LegendMakie.lplot!(
     Makie.linkxaxes!(axl, axd)
 
     !isempty(title) && Makie.Label(g[1, :, Makie.Top()], title, padding = (0, 0, titlegap, 0), fontsize = titlesize, font = :bold)
-    Makie.current_axis!(ax)
-    watermark && LegendMakie.add_watermarks!(; final, kwargs...)
+    Makie.current_axis!(fig, ax)
+    watermark && LegendMakie.add_watermarks!(fig, ax; final, kwargs...)
     fig
 end
 
 # time-ordered filter weights against the trapezoid read out at t50 + rt + ft/2
 function LegendMakie.lplot!(
+        fig::Makie.Figure,
         report::NamedTuple{(:coeffs, :grid, :superpulse, :t_pickoff, :n_pre, :n_post)};
         idxs = eachindex(report.grid), rt = 5.0u"µs", ft = 2.5u"µs",
         title::AbstractString = "", titlesize = 18, xlims = nothing, ylims = nothing, legend_position = :lt,
         row::Int = 1, col::Int = 1, watermark::Bool = true, final::Bool = !isempty(title), kwargs...
     )
-    fig = Makie.current_figure()
     Δt = step(report.superpulse.time)
     trel = (-report.n_pre:report.n_post) .* Unitful.ustrip(u"µs", Δt)
     ax = Makie.Axis(fig[row, col]; title, titlesize, limits = (xlims, ylims), titlefont = :bold,
@@ -82,19 +82,19 @@ function LegendMakie.lplot!(
     Makie.lines!(ax, k .* Unitful.ustrip(u"µs", Δt), [fill(-1 / L, L); zeros(F); fill(1 / L, L)]; color = :black, linestyle = :dash, linewidth = 2, label = "Trapezoid $rt + $ft")
     Makie.vlines!(ax, [0.0, Unitful.ustrip(u"µs", report.t_pickoff)]; color = [LegendMakie.PPCPurple, LegendMakie.BEGeOrange], linestyle = :dot, linewidth = 2)
     legend_position == :none || Makie.axislegend(ax, position = legend_position)
-    Makie.current_axis!(ax)
-    watermark && LegendMakie.add_watermarks!(; final, kwargs...)
+    Makie.current_axis!(fig, ax)
+    watermark && LegendMakie.add_watermarks!(fig, ax; final, kwargs...)
     fig
 end
 
 # superpulse and filter output (the output at time t belongs to the window ending at t)
 function LegendMakie.lplot!(
+        fig::Makie.Figure,
         report::NamedTuple{(:superpulse, :response, :grid, :t50, :t_pickoff, :n_pre, :n_post)};
         idxs = eachindex(report.grid), title::AbstractString = "", titlesize = 18, titlegap = 0,
         xlims = nothing, ylims = nothing, zoom_xlims = nothing, zoom_ylims = (0.99, 1.01), legend_position = :lt,
         row::Int = 1, col::Int = 1, watermark::Bool = true, final::Bool = !isempty(title), kwargs...
     )
-    fig = Makie.current_figure()
     Δt = Unitful.ustrip(u"µs", step(report.superpulse.time))
     t_sp = Unitful.ustrip.(u"µs", report.superpulse.time)
     t0 = dplms_t0(report.superpulse, report.t50)
@@ -114,18 +114,18 @@ function LegendMakie.lplot!(
     legend_position == :none || Makie.axislegend(axs[1], position = legend_position)
     # a row of its own: the top tick label of the zoom axis reaches above the axes
     !isempty(title) && Makie.Label(g[0, :], title, padding = (0, 0, titlegap, 0), fontsize = titlesize, font = :bold)
-    Makie.current_axis!(axs[2])
-    watermark && LegendMakie.add_watermarks!(; final, kwargs...)
+    Makie.current_axis!(fig, axs[2])
+    watermark && LegendMakie.add_watermarks!(fig, axs[2]; final, kwargs...)
     fig
 end
 
 # noise, flat-top and reference matrices and the noise autocorrelation
 function LegendMakie.lplot!(
+        fig::Makie.Figure,
         report::NamedTuple{(:noise, :flattops, :ref, :superpulse, :n_pre, :n_post)};
         ff::Integer = maximum(keys(report.flattops)), title::AbstractString = "", titlesize = 18, titlegap = 0,
         row::Int = 1, col::Int = 1, watermark::Bool = true, final::Bool = !isempty(title), kwargs...
     )
-    fig = Makie.current_figure()
     Δt = Unitful.ustrip(u"µs", step(report.superpulse.time))
     s = (-report.n_pre:report.n_post) .* Δt
     g = Makie.GridLayout(fig[row, col])
@@ -147,7 +147,7 @@ function LegendMakie.lplot!(
     Makie.lines!(ax, (0:(n - 1)) .* Δt, acf ./ first(acf); color = LegendMakie.ICPCBlue, linewidth = 2)
     # a row of its own: the matrix axes carry titles
     !isempty(title) && Makie.Label(g[0, :], title, padding = (0, 0, titlegap, 0), fontsize = titlesize, font = :bold)
-    Makie.current_axis!(ax)
-    watermark && LegendMakie.add_watermarks!(; final, kwargs...)
+    Makie.current_axis!(fig, ax)
+    watermark && LegendMakie.add_watermarks!(fig, ax; final, kwargs...)
     fig
 end
