@@ -25,14 +25,19 @@ asym_all = 1.0 .+ 0.1 .* rand(rng, n_ft)
 asym_all[.!ok_ft] .= NaN
 fct_all = 1e-3 .* rand(rng, n_ft)
 fct_all[.!ok_ft] .= NaN
+ct_spread_all = (0.5 .* rand(rng, n_ft))u"keV"
+ct_spread_all[.!ok_ft] .= NaN * u"keV"
 table_ft = TypedTables.Table(ft = e_grid_ft, status = [o ? "ok" : "fit failed" for o in ok_ft],
     fwhm_before = fwhm_all .+ 0.2u"keV", fwhm = fwhm_all, w90 = w90_all, asym = asym_all, tail_fraction = 0.05 .* rand(rng, n_ft),
     tail_scale = rand(rng, n_ft)u"keV", centroid = fill(2614.0u"keV", n_ft), fct = fct_all,
-    m_cal_simple = fill(0.01u"keV", n_ft), ctc_converged = trues(n_ft), n_events = fill(5000, n_ft))
+    ct_spread = ct_spread_all, m_cal_simple = fill(0.01u"keV", n_ft), ctc_converged = trues(n_ft), n_events = fill(5000, n_ft))
 # As produced by fit_fwhm_ft: the vectors hold the successful points only, the table all points.
 report_ft = (ft = Measurements.measurement(e_grid_ft[5], 0.2u"µs"), min_fwhm = fwhm_all[5], min_objective = w90_all[5],
     objective = :w90, legacy_ft = Measurements.measurement(e_grid_ft[4], 0.2u"µs"), e_grid_ft = e_grid_ft[ok_ft],
-    fwhm = fwhm_all[ok_ft], w90 = w90_all[ok_ft], asym = asym_all[ok_ft], fct = fct_all[ok_ft], table = table_ft)
+    fwhm = fwhm_all[ok_ft], w90 = w90_all[ok_ft], asym = asym_all[ok_ft], fct = fct_all[ok_ft],
+    ct_spread = ct_spread_all[ok_ft], objective_values = w90_all[ok_ft], table = table_ft)
+objective_ct = sqrt.(fwhm_all .^ 2 .+ (0.1 .* ct_spread_all) .^ 2)
+report_ft_ct = merge(report_ft, (objective = :fwhm_ct, min_objective = objective_ct[5], objective_values = objective_ct[ok_ft]))
 
 rts = repeat((4.0:0.5:6.0)u"µs", inner = 3)
 fts = repeat((1.8:0.2:2.2)u"µs", outer = 5)
@@ -43,9 +48,9 @@ table_rtft = TypedTables.Table(rt = rts, ft = fts, stage = fill(:neighbor, n_rtf
     step_rt = fill(0.5u"µs", n_rtft), step_ft = fill(0.2u"µs", n_rtft), status = fill("ok", n_rtft),
     fwhm_before = fwhm_rtft .+ 0.2u"keV", fwhm = fwhm_rtft, w90 = 1.9 .* fwhm_rtft, asym = 1.0 .+ 0.1 .* rand(rng, n_rtft),
     tail_fraction = 0.05 .* rand(rng, n_rtft), tail_scale = rand(rng, n_rtft)u"keV", centroid = fill(2614.0u"keV", n_rtft),
-    fct = 1e-3 .* rand(rng, n_rtft), m_cal_simple = fill(0.01u"keV", n_rtft), ctc_converged = trues(n_rtft), n_events = fill(5000, n_rtft))
+    fct = 1e-3 .* rand(rng, n_rtft), ct_spread = (0.5 .* rand(rng, n_rtft))u"keV", m_cal_simple = fill(0.01u"keV", n_rtft), ctc_converged = trues(n_rtft), n_events = fill(5000, n_rtft))
 search_path = [(5.0u"µs", 2.0u"µs"), (5.5u"µs", 2.0u"µs"), (5.5u"µs", 2.2u"µs")]
-report_rtft = (rt = 5.5u"µs", ft = 2.2u"µs", objective = :w90, table = table_rtft, path = search_path)
+report_rtft = (rt = 5.5u"µs", ft = 2.2u"µs", objective = :w90, table = table_rtft, path = search_path, objective_values = table_rtft.w90)
 
 function fake_peak_fit(μ, σ, n)
     x = μ .+ σ .* randn(rng, n)
@@ -63,11 +68,6 @@ function fake_residuals(n)
 end
 report_residuals = (legacy = fake_residuals(5000), new = fake_residuals(5000))
 
-aoe_values = vcat(1.0 .+ 0.01 .* randn(rng, 20000), 0.85 .+ 0.05 .* randn(rng, 8000))
-report_aoe = (h = StatsBase.normalize(StatsBase.fit(StatsBase.Histogram, aoe_values, 0.7:0.002:1.1), mode = :pdf),
-    f_fit = x -> x < 1.0 ? 0.0 : 2 * Distributions.pdf(Distributions.Normal(1.0, 0.01), x),
-    μ = 1.0, σ = 0.01, cut_value = 0.98, n_sigma = 2.0, sf = 0.72)
-
 t_wf = range(0u"µs", 100u"µs", length = 1600)
 t_flt = range(20u"µs", 100u"µs", length = 1280)
 step_wf(t0) = RadiationDetectorSignals.RDWaveform(t_wf, [t < t0 ? 0.0 : 1.0 for t in t_wf] .+ 0.01 .* randn(rng, length(t_wf)))
@@ -83,6 +83,8 @@ report_wvfs = (classes = wvf_classes,
         @test_nowarn LegendMakie.lplot(report_ft, title = "Test", figsize = (600, 900))
         @test LegendMakie.lplot(report_ft, figsize = (600, 900)) isa Makie.Figure
         @test LegendMakie.lplot(report_ft, legend_position = :none, watermark = false) isa Makie.Figure
+        @test_nowarn LegendMakie.lplot(report_ft_ct, title = "Test", figsize = (600, 900))
+        @test LegendMakie.lplot(report_ft_ct, legend_position = :none) isa Makie.Figure
         @test LegendMakie.lplot(merge(report_ft, (table = TypedTables.Table(merge(TypedTables.columns(table_ft), (status = fill("ok", n_ft),))),))) isa Makie.Figure
     end
     @testset "ft scan without qdrift" begin
@@ -94,16 +96,16 @@ report_wvfs = (classes = wvf_classes,
     @testset "rt/ft landscape" begin
         @test_nowarn LegendMakie.lplot(report_rtft, legacy = (5.0u"µs", 1.8u"µs"), title = "Test", figsize = (700, 550))
         @test LegendMakie.lplot(report_rtft) isa Makie.Figure
-        @test LegendMakie.lplot(merge(report_rtft, (objective = :fwhm_asym,))) isa Makie.Figure
-        @test LegendMakie.lplot(merge(report_rtft, (objective = :asym,)), legend_position = :none) isa Makie.Figure
+        @test LegendMakie.lplot(merge(report_rtft, (objective = :fwhm_asym, objective_values = table_rtft.fwhm .* table_rtft.asym))) isa Makie.Figure
+        @test LegendMakie.lplot(merge(report_rtft, (objective = :asym, objective_values = table_rtft.asym)), legend_position = :none) isa Makie.Figure
+        @test LegendMakie.lplot(merge(report_rtft, (objective = :fwhm_ct, objective_values = table_rtft.fwhm .+ table_rtft.ct_spread))) isa Makie.Figure
         # optimum off the path: a segment from the last path point to the optimum
         optimum_segments(fig) = [p for ax in fig.content if ax isa Makie.Axis for p in ax.scene.plots if p isa Makie.Lines && p.label[] == "Path to optimum"]
         fig = LegendMakie.lplot(merge(report_rtft, (rt = 5.0u"µs", ft = 2.4u"µs")))
         @test fig isa Makie.Figure
         @test length(optimum_segments(fig)) == 1
         @test isempty(optimum_segments(LegendMakie.lplot(report_rtft)))
-        @test_throws ArgumentError LegendMakie.lplot(merge(report_rtft,
-            (table = TypedTables.Table(merge(TypedTables.columns(table_rtft), (w90 = fill(NaN * u"keV", n_rtft),))),)))
+        @test_throws ArgumentError LegendMakie.lplot(merge(report_rtft, (objective_values = fill(NaN * u"keV", n_rtft),)))
     end
     @testset "crosscheck peaks" begin
         @test_nowarn LegendMakie.lplot(report_peaks, title = "Test", figsize = (700, 900))
@@ -134,11 +136,6 @@ report_wvfs = (classes = wvf_classes,
         fig = LegendMakie.lplot(nan_report)
         heatmaps = [p for ax in fig.content if ax isa Makie.Axis for p in ax.scene.plots if p isa Makie.Heatmap]
         @test sum(heatmaps[1][3][]) == length(report_residuals.legacy.residual) - 1
-    end
-    @testset "A/E selection" begin
-        @test_nowarn LegendMakie.lplot(report_aoe, title = "Test")
-        @test LegendMakie.lplot(report_aoe, legend_position = :none) isa Makie.Figure
-        @test LegendMakie.lplot(report_aoe, fit_label = "fit sample", selection_label = "selected sample") isa Makie.Figure
     end
     @testset "example waveforms" begin
         @test_nowarn LegendMakie.lplot(report_wvfs, title = "Test", figsize = (1200, 600))
