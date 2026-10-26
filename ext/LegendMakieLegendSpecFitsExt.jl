@@ -440,10 +440,11 @@ module LegendMakieLegendSpecFitsExt
     end
 
     # plot report from fit_fwhm_ft with qdrift: FWHM, W90, asymmetry and qdrift slope versus flat-top time,
-    # with the optimum of the objective and the legacy FWHM optimum marked; flat-top times whose
+    # with the optimum of the objective and the legacy FWHM optimum marked; an objective other than
+    # `:fwhm, :w90, :asym` is overlaid on the FWHM panel; flat-top times whose
     # fit failed (`table.status != "ok"`) are marked by gray dotted lines
     function LegendMakie.lplot!(
-            report::NamedTuple{(:ft, :min_fwhm, :min_objective, :objective, :legacy_ft, :e_grid_ft, :fwhm, :w90, :asym, :fct, :table)};
+            report::NamedTuple{(:ft, :min_fwhm, :min_objective, :objective, :legacy_ft, :e_grid_ft, :fwhm, :w90, :asym, :fct, :ct_spread, :objective_values, :table)};
             title::AbstractString = "", titlesize = 18, xunit = u"µs", e_unit = u"keV",
             legend_position = :rt, watermark::Bool = true, final::Bool = !isempty(title), kwargs...
         )
@@ -463,11 +464,17 @@ module LegendMakieLegendSpecFitsExt
             ("Qdrift slope (ADC / qdrift)", Measurements.value.(report.fct))
         )
 
+        overlay = report.objective ∉ (:fwhm, :w90, :asym)
+        y_objective = Measurements.value.(report.objective_values)
+        eltype(y_objective) <: Unitful.Quantity && (y_objective = Unitful.ustrip.(e_unit, y_objective))
+        objective_label = report.objective == :fwhm_ct ? "FWHM ⊕ k · drift spread" : string(report.objective)
+
         axs = Makie.Axis[]
         for (row, (ylabel, y)) in enumerate(rows)
             ax = Makie.Axis(g[row, 1]; ylabel, xlabel = "Flat-Top Time ($xunit)", titlefont = :bold,
                 title = row == 1 ? title : "", titlesize)
             Makie.scatterlines!(ax, x, y, color = :black)
+            overlay && row == 1 && Makie.scatterlines!(ax, x, y_objective, color = :orange, marker = :utriangle)
             Makie.vlines!(ax, [ft_new], color = :red)
             Makie.vlines!(ax, [ft_legacy], color = :blue, linestyle = :dash)
             any(failed) && Makie.vlines!(ax, ft_failed, color = :gray, linestyle = :dot)
@@ -480,6 +487,10 @@ module LegendMakieLegendSpecFitsExt
         if legend_position != :none
             elements = [Makie.LineElement(color = :red), Makie.LineElement(color = :blue, linestyle = :dash)]
             labels = ["Optimum ($(report.objective)): $(round(ft_new, digits = 2)) $xunit", "Legacy (FWHM): $(round(ft_legacy, digits = 2)) $xunit"]
+            if overlay
+                push!(elements, Makie.LineElement(color = :orange))
+                push!(labels, objective_label)
+            end
             if any(failed)
                 push!(elements, Makie.LineElement(color = :gray, linestyle = :dot))
                 push!(labels, "Failed")
@@ -495,13 +506,13 @@ module LegendMakieLegendSpecFitsExt
     # plot report from optimize_rtft: every evaluated (rt, ft) colored by its objective value,
     # failed evaluations hollow, the accepted search path, seed, optimum and optional legacy optimum
     function LegendMakie.lplot!(
-            report::NamedTuple{(:rt, :ft, :objective, :table, :path)};
+            report::NamedTuple{(:rt, :ft, :objective, :table, :path, :objective_values)};
             legacy = nothing, title::AbstractString = "", titlesize = 18, xunit = u"µs", yunit = u"µs",
             colormap = :viridis, legend_position = :rt, watermark::Bool = true, final::Bool = !isempty(title), kwargs...
         )
 
         t = report.table
-        obj = report.objective == :fwhm_asym ? t.fwhm .* t.asym : getproperty(t, report.objective)
+        obj = report.objective_values
         obj_unit = Unitful.unit(first(obj))
         z = Unitful.ustrip.(obj_unit, Measurements.value.(obj))
         rt = Unitful.ustrip.(xunit, Measurements.value.(t.rt))
@@ -641,37 +652,6 @@ module LegendMakieLegendSpecFitsExt
         # top-left panel, whose title is right-aligned
         Makie.current_axis!(first(Makie.contents(g[1, 1])))
         watermark && LegendMakie.add_watermarks!(; position, final, kwargs...)
-        fig
-    end
-
-    # plot the coarse in-situ single-site A/E selection of the filter crosscheck: the histogram and
-    # the fit describe the sample the band is fitted on (`fit_label`), the kept fraction `sf` refers
-    # to the sample the cut is applied to (`selection_label`)
-    function LegendMakie.lplot!(
-            report::NamedTuple{(:h, :f_fit, :μ, :σ, :cut_value, :n_sigma, :sf)};
-            title::AbstractString = "", titlesize = 18, xlabel = "A/E (a.u.)", legend_position = :lt,
-            fit_label::AbstractString = "DEP", selection_label::AbstractString = "FEP",
-            watermark::Bool = true, final::Bool = !isempty(title), kwargs...
-        )
-
-        fig = Makie.current_figure()
-        edges = first(report.h.edges)
-        ax = Makie.Axis(fig[1,1]; title, titlesize, titlefont = :bold, xlabel, ylabel = "Normalized counts",
-            limits = ((report.μ - 8 * report.σ, report.μ + 5 * report.σ), (0, nothing)))
-
-        Makie.hist!(ax, StatsBase.midpoints(edges), weights = report.h.weights, bins = edges,
-            color = LegendMakie.DiamondGrey, label = fit_label)
-        x = range(report.μ - 3 * report.σ, report.μ + 5 * report.σ, length = 500)
-        Makie.lines!(ax, x, report.f_fit.(x), color = :red,
-            label = "Half-Gaussian fit\nμ = $(round(report.μ, sigdigits = 4)), σ = $(round(report.σ, sigdigits = 2))")
-        Makie.vlines!(ax, [report.cut_value], color = LegendMakie.CoaxGreen, linewidth = 2.5,
-            label = "Cut at μ - $(report.n_sigma)σ, keeps $(round(100 * report.sf, digits = 1))% of $selection_label")
-        Makie.text!(ax, 0.98, 0.02, text = "coarse in-situ selection, not the calibrated A/E cut",
-            space = :relative, align = (:right, :bottom), fontsize = 12)
-        legend_position != :none && Makie.axislegend(ax, position = legend_position)
-
-        Makie.current_axis!(ax)
-        watermark && LegendMakie.add_watermarks!(; final, kwargs...)
         fig
     end
 
