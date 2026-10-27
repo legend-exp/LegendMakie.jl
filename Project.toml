@@ -1,6 +1,6 @@
 name = "LegendMakie"
 uuid = "ce9a434a-d062-4f11-9371-3059ddb1c48a"
-version = "0.2.3"
+version = "0.2.4"
 
 [deps]
 PrecompileTools = "aea7be01-6a6a-4083-8856-8a6e6704d82a"
