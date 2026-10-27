@@ -8,6 +8,7 @@ module LegendMakieLegendSpecFitsExt
     import LaTeXStrings
     import Makie
     import Measurements
+    import PrecompileTools
     import StatsBase
     import Unitful
 
@@ -1152,6 +1153,33 @@ module LegendMakieLegendSpecFitsExt
         watermark && LegendMakie.add_watermarks!(; final, kwargs...)
 
         fig
+    end
+
+    # Builds figures on synthetic fit reports so that the recipes above are compiled at
+    # package precompilation. Nothing is rendered: a Makie backend is not a dependency.
+    # Residual panels and watermarks are defined in LegendMakieMakieExt, which is not
+    # loaded while this extension is precompiled, so they are left out.
+    PrecompileTools.@setup_workload begin
+        x = Measurements.measurement.(100.0:100.0:1000.0, 0.5)
+        y = 0.5 .* x .+ Measurements.measurement(1.0, 0.1)
+        gof_cal = (pvalue = 0.5, chi2min = 5.0, dof = 8, residuals_norm = [sin(i) for i in 1:10], bin_centers = Measurements.value.(x))
+        report_cal = (par = [Measurements.measurement(1.0, 0.1), Measurements.measurement(0.5, 0.01)],
+            f_fit = z -> 0.5z + Measurements.measurement(1.0, 0.1), x, y, gof = gof_cal)
+
+        edges = -5.0:0.5:5.0
+        centers = collect(edges[1:end-1] .+ step(edges) / 2)
+        h = StatsBase.Histogram(edges, [exp(-c^2 / 2) / sqrt(2π) * step(edges) + 0.001 for c in centers])
+        gof_gauss = (pvalue = 0.5, chi2min = 5.0, dof = 17, residuals_norm = [cos(i) for i in eachindex(centers)], bin_centers = centers)
+        report_gauss = (f_fit = z -> exp(-z^2 / 2) / sqrt(2π), h, μ = Measurements.measurement(0.0, 0.01),
+            σ = Measurements.measurement(1.0, 0.01), gof = gof_gauss)
+
+        PrecompileTools.@compile_workload begin
+            for report in (report_cal, report_gauss)
+                fig = Makie.Figure()
+                LegendMakie.lplot!(report; title = "Title", xlabel = "Energy (ADC)", show_residuals = false, watermark = false)
+                Base.empty!(fig)
+            end
+        end
     end
 
 end

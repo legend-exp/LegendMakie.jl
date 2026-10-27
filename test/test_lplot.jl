@@ -357,8 +357,9 @@ end
         det = LegendDataManagement.DetectorId(:V99000A)
         @testset "Event plots" begin 
             @test_nowarn LegendMakie.lplot(data, t_cal, figsize = (800,600), xlims = (0,128))
-            # the test data holds no SiPM channels: the default `system` warns about them
-            @test_logs (:warn,) LegendMakie.lplot!(data, t_phy, xlims = (0,128))
+            # the test data holds no SiPM channels: the default `system` warns about them; other
+            # warnings, e.g. deprecations in dependencies, are ignored
+            @test_logs (:warn, r"No processable channels found for system spms") match_mode = :any LegendMakie.lplot!(data, t_phy, xlims = (0,128))
             @test LegendMakie.lplot(data, t_phy).scene.viewport[].widths == [800, 600]
             @test_nowarn LegendMakie.lplot(data, t_phy; system = :geds)
             @test_nowarn LegendMakie.lplot(data, t_phy; system = [:geds])
