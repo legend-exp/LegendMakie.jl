@@ -9,6 +9,7 @@ module LegendMakieMakieExt
     import Format
     import Makie
     import MathTeXEngine
+    import PrecompileTools
     import StatsBase
 
     include("recipes/legend_theme.jl")
@@ -65,4 +66,6 @@ module LegendMakieMakieExt
         cleanup && Base.empty!(fig)
         return ret
     end
+
+    include("recipes/precompile.jl")
 end

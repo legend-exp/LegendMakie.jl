@@ -12,6 +12,7 @@ Test.@testset "Aqua tests" begin
     Aqua.test_all(
         LegendMakie,
         ambiguities = true,
-        #stale_deps=(ignore=[:SomePackage],),
+        # PrecompileTools is used only by the package extensions
+        stale_deps = (ignore = [:PrecompileTools],),
     )
 end # testset
