@@ -18,7 +18,7 @@ energies = [1592.513, 2103.512, 2614.511]u"keV";
 # `autocal_energy` finds the calibration peaks in the uncalibrated spectrum; the report
 # shows the spectrum with the peaks found and the calibration lines.
 
-result_autocal, report_autocal = autocal_energy(e_uncal, energies, α = 0.01, rtol = 2)
+result_autocal, report_autocal = autocal_energy(e_uncal, energies, α = 0.01, rtol = 5e-3)
 lplot(report_autocal, energies, title = "Peak search")
 
 # ## Simple calibration
