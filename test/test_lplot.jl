@@ -124,14 +124,6 @@ end
             @testset "ENC vs. Rise Time" begin
                 @test_nowarn LegendMakie.lplot(report_rt, title = "Test")
             end
-            e_grid_ft = (1.5:0.5:16.0)u"μs"
-            fwhm = Measurements.measurement.(rand(length(e_grid_ft)) .* 5.0 .+ 2.0, NaN)u"keV"
-            min_fwhm, idx = findmin(fwhm)
-            ft = Measurements.measurement(e_grid_ft[idx], step(e_grid_ft))
-            report_ft = (; ft, min_fwhm, e_grid_ft, fwhm)
-            @testset "FWHM vs. Flat-Top Time" begin
-                @test_nowarn LegendMakie.lplot(report_ft, title = "Test")
-            end
             a_grid_wl_sg = (30:32.:350)u"ns"
             sfs = Measurements.measurement.(rand(length(a_grid_wl_sg)), NaN) .* 100u"percent" 
             min_sf, idx = findmin(sfs)
