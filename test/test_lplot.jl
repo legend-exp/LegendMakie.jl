@@ -150,6 +150,25 @@ end
             end
         end
 
+        @testset "PMT single-photoelectron fit" begin
+            # report as returned by LegendSpecFits.fit_pmt_spe
+            pe1(x) = 20_000 * exp(-((x - 17) / 6)^2 / 2) / (6 * sqrt(2π))
+            pe2(x) = 2_000 * exp(-((x - 34) / (sqrt(2) * 6))^2 / 2) / (sqrt(2) * 6 * sqrt(2π))
+            expo(x) = x >= 4 ? 3_000 / 3 * exp(-(x - 4) / 3) : NaN
+            h = StatsBase.fit(StatsBase.Histogram, vcat(abs.(0.8 .+ 0.3 .* randn(50_000)), 4 .- 3 .* log.(rand(3_000)),
+                                                        17 .+ 6 .* randn(20_000), 34 .+ 8.5 .* randn(2_000)), 0:1.0:100)
+            centers = StatsBase.midpoints(first(h.edges))
+            fitted = centers .>= 4
+            gof = (converged = true, pvalue = 0.4, chi2 = 98.0, dof = 90, covmat = zeros(6, 6),
+                   residuals = zeros(count(fitted)), residuals_norm = randn(count(fitted)), bin_centers = centers[fitted])
+            report = (h = h, f_fit = x -> x >= 4 ? expo(x) + pe1(x) + pe2(x) : NaN,
+                      f_components = (exponential = expo, pe1 = pe1, pe2 = pe2),
+                      x_min = 4.0, μ1 = Measurements.measurement(17.0, 0.1), gof = gof)
+            @test_nowarn lplot(report, title = "Test")
+            @test_nowarn lplot(report, show_components = false, show_residuals = false, legend_position = :none, yscale = Makie.identity)
+            @test_nowarn lplot(merge(report, (gof = (converged = false,),)))
+        end
+
         @testset "Energy calibration" begin
             ecal = filter(x -> x <= 265_000, vcat(rand(Distributions.Exponential(70_000),97_000), 261_450 .+ 200 .* randn(2_000), 210_350 .+ 185 .* randn(500), 159_300 .+ 170 .* randn(500)))
             lines = [:Tl208DEP, :Tl208SEP, :Tl208FEP]
