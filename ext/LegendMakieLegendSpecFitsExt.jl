@@ -395,6 +395,76 @@ module LegendMakieLegendSpecFitsExt
         fig
     end
 
+    # plot report of LegendSpecFits.fit_pmt_spe: PMT single-photoelectron spectrum
+    function LegendMakie.lplot!(
+            report::NamedTuple{(:h, :f_fit, :f_components, :x_min, :μ1, :gof)};
+            xlabel = "Pulse height (ADC)", ylabel = "Counts / $(round(step(first(report.h.edges)), digits = 2)) ADC",
+            xlims = extrema(first(report.h.edges)), yscale = Makie.log10,
+            ylims = yscale == Makie.log10 ? (0.5, maximum(report.h.weights) * 3) : (0, maximum(report.h.weights) * 1.2),
+            title::AbstractString = "", titlesize = 18, show_components::Bool = true, show_residuals::Bool = true,
+            show_label::Bool = true, legend_position = :rt, xticks = Makie.automatic, yticks = Makie.automatic,
+            row::Int = 1, col::Int = 1, watermark::Bool = true, final::Bool = !isempty(title), kwargs...
+        )
+
+        fig = Makie.current_figure()
+
+        g = Makie.GridLayout(fig[row, col])
+        ax = Makie.Axis(g[1, 1],
+            title = title, titlefont = :bold, limits = (xlims, ylims);
+            xlabel, ylabel, xticks, yticks, yscale, titlesize
+        )
+
+        bin_width = step(first(report.h.edges))
+        x = range(report.x_min, last(first(report.h.edges)), length = 1000)
+        μ1 = Measurements.value(report.μ1)
+
+        Makie.vspan!(ax, first(xlims), report.x_min, color = (LegendMakie.DiamondGrey, 0.3), label = ifelse(show_label, "Not fitted", nothing))
+        Makie.hist!(ax, StatsBase.midpoints(first(report.h.edges)), weights = report.h.weights, bins = first(report.h.edges),
+            color = LegendMakie.DiamondGrey, label = "Data", fillto = 1e-2)
+        Makie.lines!(ax, x, report.f_fit.(x) .* bin_width, color = LegendMakie.DeepCove, linewidth = 2,
+            label = ifelse(show_label, "Best Fit" * (haskey(report.gof, :pvalue) ? " (p = $(round(report.gof.pvalue, digits = 2)))" : ""), nothing))
+
+        if show_components
+            for (component, linestyle, label) in ((:pe1, :dash, "1 p.e."), (:pe2, :dashdot, "2 p.e."))
+                y = report.f_components[component].(x) .* bin_width
+                Makie.lines!(ax, x, ifelse.(y .> first(ylims), y, NaN), color = LegendMakie.AchatBlue, linestyle = linestyle, linewidth = 1.5,
+                    label = ifelse(show_label, label, nothing))
+            end
+        end
+
+        Makie.vlines!(ax, [μ1], color = LegendMakie.AchatBlue, linestyle = :dot,
+            label = ifelse(show_label, "μ1 = $(round_wo_units(report.μ1, digits = 2)) ADC", nothing))
+        Makie.vlines!(ax, [2μ1], color = (LegendMakie.AchatBlue, 0.6), linestyle = :dot)
+
+        if haskey(report.gof, :residuals_norm) && show_residuals
+
+            ax.xticklabelsize = 0
+            ax.xticksize = 0
+            ax.xlabel = ""
+
+            ax2 = Makie.Axis(g[2, 1],
+                xlabel = xlabel, ylabel = "Residuals (σ)",
+                xticks = xticks, yticks = -3:3:3, limits = (xlims, (-5, 5))
+            )
+            LegendMakie.residualplot!(ax2, (x = report.gof.bin_centers, residuals_norm = report.gof.residuals_norm))
+
+            Makie.linkxaxes!(ax, ax2)
+            Makie.rowgap!(g, 0)
+            Makie.rowsize!(g, 1, Makie.Auto(3))
+
+            yspace = maximum(Makie.tight_yticklabel_spacing!, (ax, ax2))
+            ax.yticklabelspace = yspace
+            ax2.yticklabelspace = yspace
+        end
+
+        legend_position != :none && Makie.axislegend(ax, backgroundcolor = (:white, 0.7), framevisible = true, framecolor = :lightgray, position = legend_position)
+
+        Makie.current_axis!(ax)
+        watermark && LegendMakie.add_watermarks!(; final, kwargs...)
+
+        fig
+    end
+
     # plot report from filter optimzations, e.g. fit_enc_sigmas, fit_fwhm_ft, fit_sf_wl 
     function LegendMakie.lplot!(
             report::NamedTuple{(:x, :minx, :y, :miny)};
