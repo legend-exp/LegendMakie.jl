@@ -1155,6 +1155,8 @@ module LegendMakieLegendSpecFitsExt
         fig
     end
 
+    include("recipes/dplms.jl")
+
     # Builds figures on synthetic fit reports so that the recipes above are compiled at
     # package precompilation. Nothing is rendered: a Makie backend is not a dependency.
     # Residual panels and watermarks are defined in LegendMakieMakieExt, which is not

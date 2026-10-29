@@ -145,9 +145,37 @@ end
             min_obj, idx = findmin(obj)
             wl = Measurements.measurement(a_grid_wl_sg[idx], step(a_grid_wl_sg))
             report_obj = (; wl, min_obj, gain = missing, res_1pe = missing, pos_1pe = missing, threshold = missing, a_grid_wl_sg, obj, report_simple = missing, report_fit = missing)
-            @testset "SiPM: Objective vs. Window length" begin 
+            @testset "SiPM: Objective vs. Window length" begin
                 @test_nowarn LegendMakie.lplot(report_obj, title = "Test")
             end
+        end
+
+        @testset "DPLMS recipes" begin
+            n_pre, n_post = 25, 25
+            n = n_pre + n_post + 1
+            t = (0:199) .* 128.0u"ns"
+            superpulse = RadiationDetectorSignals.RDWaveform(t, [1 / (1 + exp(-(i - 100) / 2)) for i in 1:200])
+            response = [RadiationDetectorSignals.RDWaveform(t, superpulse.signal .* (1 + 0.01k)) for k in 1:3]
+            t50 = fill(t[100], 10)
+            t_pickoff = n_post * 128.0u"ns"
+            grid = [(nm = 1.0, za = 1e3, ft = 1.0, ct = 0.0, ff = ff) for ff in (2, 4, 6)]
+            coeffs = [randn(n) for _ in grid]
+            ref = superpulse.signal[(100 - n_pre):(100 + n_post)]
+            ref_bins = hcat(ref, ref .* 0.99)
+            A = randn(n, n)
+            noise = A * A'
+            flattops = Dict(ff => A' * A for ff in (2, 4, 6))
+            fwhm_ctc = [Measurements.measurement(2.6, 0.02)u"keV", missing, Measurements.measurement(2.7, 0.02)u"keV"]
+            fwhm_raw = [Measurements.measurement(2.9, 0.02)u"keV", Measurements.measurement(2.8, 0.02)u"keV", Measurements.measurement(2.85, 0.02)u"keV"]
+            refs = [(label = "Trapezoid", ctc = 2.6u"keV", raw = 2.9u"keV")]
+            noise_out = [0.01, 0.011, 0.012]
+            @test lplot((; superpulse, ref, ref_bins, t50, t_pickoff, n_pre, n_post); title = "Test") isa Makie.Figure
+            @test lplot((; coeffs, grid, superpulse, t_pickoff, n_pre, n_post); rt = 1.0u"µs", ft = 0.5u"µs") isa Makie.Figure
+            @test_throws ArgumentError lplot((; coeffs, grid, superpulse, t_pickoff, n_pre, n_post))
+            @test lplot((; superpulse, response, grid, t50, t_pickoff, n_pre, n_post)) isa Makie.Figure
+            @test lplot((; noise, flattops, ref, superpulse, n_pre, n_post); ff = 4) isa Makie.Figure
+            @test lplot((; grid, noise_out, t_pickoff, n_post, fwhm_ctc, fwhm_raw, refs)) isa Makie.Figure
+            @test_throws ArgumentError lplot((; grid, noise_out, t_pickoff, n_post, fwhm_ctc, fwhm_raw, refs); x = :ct)
         end
 
         @testset "Energy calibration" begin
