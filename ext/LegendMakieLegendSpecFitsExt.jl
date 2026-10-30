@@ -400,7 +400,12 @@ module LegendMakieLegendSpecFitsExt
             report::NamedTuple{(:h, :f_fit, :f_components, :x_min, :μ1, :gof)};
             xlabel = "Pulse height (ADC)", ylabel = "Counts / $(round(step(first(report.h.edges)), digits = 2)) ADC",
             xlims = extrema(first(report.h.edges)), yscale = Makie.log10,
-            ylims = yscale == Makie.log10 ? (0.5, maximum(report.h.weights) * 3) : (0, maximum(report.h.weights) * 1.2),
+            ylims = if yscale == Makie.log10
+                (0.5, maximum(report.h.weights) * 3)
+            else
+                # the pedestal below the fit range would dwarf the 1 p.e. peak
+                (0, maximum(report.h.weights[StatsBase.midpoints(first(report.h.edges)) .>= report.x_min]; init = 1) * 1.2)
+            end,
             title::AbstractString = "", titlesize = 18, show_components::Bool = true, show_residuals::Bool = true,
             show_label::Bool = true, legend_position = :rt, xticks = Makie.automatic, yticks = Makie.automatic,
             row::Int = 1, col::Int = 1, watermark::Bool = true, final::Bool = !isempty(title), kwargs...
