@@ -1099,7 +1099,7 @@ module LegendMakieLegendSpecFitsExt
 
     # plot report of sipm_simple_calibration (needs the extended report of LegendSpecFits > 0.4.6)
     function LegendMakie.lplot!(
-            report::NamedTuple{(:peakpos, :peakpos_cal, :h_uncal, :h_calsimple, :h_uncal_full, :h_calsimple_full, :noise_threshold, :noise_threshold_cal, :valley_found)};
+            report::NamedTuple{(:peakpos, :peakpos_cal, :h_uncal, :h_calsimple, :h_uncal_full, :h_calsimple_full, :noise_threshold, :noise_threshold_cal, :valley_found, :trigger_threshold, :trigger_threshold_cal)};
             cal::Bool = true, title::AbstractString = "", titlesize = 18, titlegap = 2,
             h = _sipm_composite_hist(report, cal),
             label = "Amplitudes", peak_label = "Reconstructed\npeak positions",
@@ -1119,6 +1119,9 @@ module LegendMakieLegendSpecFitsExt
         cut = cal ? report.noise_threshold_cal : report.noise_threshold
         Makie.vlines!(ax, [cut], color = :green, linewidth = 1.5,
             label = "Noise cut: $(round(cut, digits = cal ? 3 : 1)) $(cal ? "P.E." : "ADC")")
+        trigger_cut = cal ? report.trigger_threshold_cal : report.trigger_threshold
+        Makie.vlines!(ax, [trigger_cut], color = :orange, linewidth = 1.5,
+            label = "Trigger cut: $(round(trigger_cut, digits = cal ? 3 : 1)) $(cal ? "P.E." : "ADC")")
         legend_position != :none && Makie.axislegend(ax, framevisible = true, framewidth = 0, position = legend_position)
 
         # add watermarks
