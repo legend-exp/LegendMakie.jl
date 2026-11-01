@@ -1132,6 +1132,207 @@ module LegendMakieLegendSpecFitsExt
     end
 
 
+    # plot report of fit_sipm_template: aligned pulses (ADC, normalised), template vs target, tail with its continuation, noise spectrum, residuals, pulse maxima
+    function LegendMakie.lplot!(
+            report::NamedTuple{(:t, :pulse, :target, :tail, :amplitude, :h_heatmap, :h_heatmap_norm, :h_residual, :residual_bands, :h_amp, :baseline_σ, :n_pulses, :freq, :psd, :n_noise, :h_noise, :noise_fit)};
+            plot_type::Symbol = :heatmap, title::AbstractString = "", titlesize = 18, titlegap = 2,
+            xlabel = "Time after trigger (µs)", legend_position = :rt, watermark::Bool = true, final::Bool = !isempty(title), kwargs...
+        )
+
+        t = Unitful.ustrip.(u"µs", report.t)
+        amplitude = round(report.amplitude, digits = 2)
+        t_hm = extrema(first(report.h_heatmap.edges))
+        sel = findall(x -> first(t_hm) <= x <= last(t_hm), t)
+
+        fig = if plot_type == :heatmap
+            fig = LegendMakie.lhist!(report.h_heatmap; title, titlesize, titlegap, xlabel, ylabel = "Amplitude (ADC)", colorbarlabel = "Pulses", watermark = false)
+            ax = Makie.current_axis()
+            Makie.lines!(ax, t[sel], report.amplitude .* report.pulse[sel], color = :white, linewidth = 2, label = "Template × $(amplitude) ADC")
+            legend_position != :none && Makie.axislegend(ax, position = legend_position, framevisible = true, framecolor = :lightgray, backgroundcolor = :gray85)
+            fig
+        elseif plot_type == :heatmap_norm
+            fig = LegendMakie.lhist!(report.h_heatmap_norm; title, titlesize, titlegap, xlabel, ylabel = "Amplitude / pulse maximum", colorbarlabel = "Pulses", watermark = false)
+            ax = Makie.current_axis()
+            Makie.lines!(ax, t[sel], report.pulse[sel], color = :white, linewidth = 2, label = "Template (median of $(report.n_pulses) pulses)")
+            legend_position != :none && Makie.axislegend(ax, position = legend_position, framevisible = true, framecolor = :lightgray, backgroundcolor = :gray85)
+            fig
+        elseif plot_type == :pulse
+            fig = Makie.current_figure()
+            ax = Makie.Axis(fig[1,1]; title, titlesize, titlegap, xlabel, ylabel = "Amplitude / pulse maximum", limits = (t_hm, nothing))
+            Makie.lines!(ax, t, report.pulse, color = :black, linewidth = 2, label = "Template (median of $(report.n_pulses) pulses)")
+            Makie.lines!(ax, t, report.target, color = :red, linewidth = 2, label = "Target stick")
+            legend_position != :none && Makie.axislegend(ax, position = legend_position)
+            fig
+        elseif plot_type == :tail
+            fig = Makie.current_figure()
+            tail = report.tail
+            t_tail = Unitful.ustrip.(u"µs", tail.t)
+            fit_window = Unitful.ustrip.(u"µs", tail.window)
+            tau = round(Unitful.ustrip(u"µs", tail.tau), digits = 2)
+            end_level = round(tail.end_level, digits = 4)
+            level = round(tail.level, digits = 4)
+            noise = report.baseline_σ / report.amplitude / sqrt(report.n_pulses)
+            ax = Makie.Axis(fig[1,1]; title, titlesize, titlegap, xlabel, ylabel = "Amplitude / pulse maximum", yscale = Makie.log10,
+                            limits = ((first(t), last(t_tail)), (max(noise / 10, 1e-5), 2)))
+            Makie.vspan!(ax, [first(fit_window)], [last(fit_window)], color = (:red, 0.1), label = "Tail fit window")
+            pos = report.pulse .> 0
+            Makie.lines!(ax, t[pos], report.pulse[pos], color = :black, linewidth = 2, label = "Template, end level $(end_level)")
+            pos_tail = tail.pulse .> 0
+            Makie.lines!(ax, t_tail[pos_tail], tail.pulse[pos_tail], color = :red, linewidth = 2, linestyle = :dash, label = "Tail fit: level $(level), τ = $(tau) µs")
+            Makie.hlines!(ax, [noise], color = :gray, linestyle = :dot, label = "Template noise σ: $(round(noise, sigdigits = 2))")
+            legend_position != :none && Makie.axislegend(ax, position = legend_position)
+            fig
+        elseif plot_type == :noise
+            fig = Makie.current_figure()
+            f_mhz = Unitful.ustrip.(u"MHz", report.freq)
+            pos = f_mhz .> 0
+            ax = Makie.Axis(fig[1,1]; title, titlesize, titlegap, xlabel = "Frequency (MHz)", ylabel = "Noise spectrum (ADC² / Hz)",
+                            xscale = Makie.log10, yscale = Makie.log10)
+            Makie.lines!(ax, f_mhz[pos], report.psd[pos], color = :black, linewidth = 1.5, label = "Median periodogram of $(report.n_noise) traces, σ = $(round(report.baseline_σ, digits = 2)) ADC")
+            legend_position != :none && Makie.axislegend(ax, position = legend_position)
+            fig
+        elseif plot_type == :residual
+            fig = LegendMakie.lhist!(report.h_residual; title, titlesize, titlegap, xlabel, ylabel = "Normalised pulse − template", colorbarlabel = "Pulses", watermark = false)
+            ax = Makie.current_axis()
+            for (band, color) in zip(report.residual_bands, (:white, :orange, :cyan))
+                band.n > 0 && Makie.lines!(ax, t[sel], band.residual, color = color, linewidth = 1.5, label = "$(band.pe) PE band ($(band.n) pulses)")
+            end
+            legend_position != :none && Makie.axislegend(ax, position = :rb, framevisible = true, framecolor = :lightgray, backgroundcolor = :gray85)
+            fig
+        elseif plot_type == :amplitude
+            fig = LegendMakie.lplot!(report.h_amp; title, titlesize, titlegap, xlabel = "Pulse maximum (ADC)", ylabel = "Counts", yscale = Makie.log10, label = "Single pulses", legend_position = :none, watermark = false, limits = ((0, 6 * report.amplitude), nothing))
+            ax = Makie.current_axis()
+            Makie.vlines!(ax, [report.amplitude], color = :red, linewidth = 1.5, label = "Most frequent maximum: $(amplitude) ADC")
+            legend_position != :none && Makie.axislegend(ax, position = legend_position)
+            fig
+        elseif plot_type == :noise_samples
+            fig = LegendMakie.lplot!(report.h_noise; title, titlesize, titlegap, xlabel = "Sample (ADC)", ylabel = "Counts", yscale = Makie.log10, label = "Samples of $(report.n_noise) noise traces", legend_position = :none, watermark = false)
+            ax = Makie.current_axis()
+            edges = first(report.h_noise.edges)
+            x = (edges[1:end-1] .+ edges[2:end]) ./ 2
+            nf = report.noise_fit
+            gauss = nf.amplitude .* exp.(-0.5 .* ((x .- nf.μ) ./ nf.σ).^2)
+            Makie.lines!(ax, x, max.(gauss, 0.5), color = :red, linewidth = 1.5, label = "Gaussian fit: μ = $(round(nf.μ, digits = 3)), σ = $(round(nf.σ, digits = 3)) ADC")
+            Makie.vlines!(ax, [report.amplitude], color = :red, linewidth = 1.5, linestyle = :dash, label = "1 PE: $(amplitude) ADC")
+            legend_position != :none && Makie.axislegend(ax, position = legend_position)
+            fig
+        else
+            throw(ArgumentError("Unknown plot_type $plot_type, use :heatmap, :heatmap_norm, :pulse, :tail, :noise, :noise_samples, :residual or :amplitude"))
+        end
+
+        # add watermarks
+        watermark && LegendMakie.add_watermarks!(; final, kwargs...)
+
+        fig
+    end
+
+
+    # plot report of fit_sipm_kernel: λ scan, response of the template to the kernel, spectra before and after the kernel, taps, deconvolved pulses
+    function LegendMakie.lplot!(
+            report::NamedTuple{(:lambdas, :tail_local, :tail_integral, :noise_per_sample, :noise_shaped, :trigger_shaping, :i_lambda, :lambda, :tail_max, :lag, :p, :g, :q_full, :q_cut, :tail_window, :freq, :pulse_spectrum, :noise_spectrum, :target_spectrum, :filtered_pulse, :filtered_noise, :taps, :taps_lag, :h_pulses, :pulses_median, :t_pulses, :n_pulses, :target_shaped, :result)};
+            plot_type::Symbol = :lambda, title::AbstractString = "", titlesize = 18, titlegap = 2,
+            legend_position = :rt, watermark::Bool = true, final::Bool = !isempty(title), kwargs...
+        )
+
+        λ = round(report.lambda, sigdigits = 2)
+        lag = Unitful.ustrip.(u"µs", report.lag)
+        N = length(lag)
+        order = vcat((N ÷ 2 + 1):N, 1:(N ÷ 2))          # centred: negative lags first
+        pos = 1:(N ÷ 2)                                # positive lags in order
+        t_win = Unitful.ustrip.(u"µs", (first(report.tail_window), last(report.tail_window)))
+        f_mhz = Unitful.ustrip.(u"MHz", report.freq)
+        fpos = f_mhz .> 0
+        g_peak = maximum(report.g)
+
+        fig = if plot_type == :lambda
+            fig = Makie.current_figure()
+            shaping = round(Int, Unitful.ustrip(u"ns", report.trigger_shaping))
+            ax = Makie.Axis(fig[1,1]; title, titlesize, titlegap, xlabel = "λ", ylabel = "Relative to the target peak", xscale = Makie.log10, yscale = Makie.log10)
+            Makie.lines!(ax, report.lambdas, max.(report.tail_local, 1e-6), color = :black, linewidth = 2, label = "Largest deviation")
+            Makie.lines!(ax, report.lambdas, max.(report.tail_integral, 1e-6), color = :black, linewidth = 2, linestyle = :dash, label = "Largest running integral")
+            Makie.lines!(ax, report.lambdas, report.noise_per_sample, color = :gray, linewidth = 2, label = "Noise / sample after the kernel")
+            Makie.lines!(ax, report.lambdas, report.noise_shaped, color = :gray, linewidth = 2, linestyle = :dash, label = "Noise / sample after 4× MWA $(shaping) ns")
+            Makie.hlines!(ax, [report.tail_max], color = :orange, linestyle = :dot, linewidth = 2, label = "Limit $(report.tail_max)")
+            Makie.vlines!(ax, [report.lambda], color = :red, linewidth = 1.5, label = "λ = $(λ)")
+            legend_position != :none && Makie.Legend(fig[2,1], ax; orientation = :horizontal, nbanks = 3, labelsize = 13, framevisible = false, tellheight = true, tellwidth = false)
+            fig
+        elseif plot_type == :response
+            fig = Makie.current_figure()
+            sel = findall(l -> -1.0 <= l <= t_win[2] + 1.0, lag[order])
+            ax = Makie.Axis(fig[1,1]; title, titlesize, titlegap, ylabel = "Amplitude / target peak", limits = ((-1.0, t_win[2] + 1.0), nothing))
+            Makie.vspan!(ax, [t_win[1]], [t_win[2]], color = (:orange, 0.2), label = "Tail window")
+            Makie.lines!(ax, lag[order][sel], report.g[order][sel] ./ g_peak, color = :red, linewidth = 2, linestyle = :dash, label = "Target")
+            Makie.lines!(ax, lag[order][sel], report.q_cut[order][sel] ./ g_peak, color = :black, linewidth = 1.5, label = "Template through the kernel, λ = $(λ)")
+            legend_position != :none && Makie.axislegend(ax, position = legend_position)
+            Makie.hidexdecorations!(ax, grid = false)
+            i_win = findall(l -> t_win[1] <= l <= t_win[2], lag[pos])
+            r = (report.q_cut[pos] .- report.g[pos]) ./ g_peak
+            ax2 = Makie.Axis(fig[2,1]; xlabel = "Time after the photon (µs)", ylabel = "Deviation / target peak", limits = ((-1.0, t_win[2] + 1.0), nothing))
+            Makie.vspan!(ax2, [t_win[1]], [t_win[2]], color = (:orange, 0.2))
+            Makie.lines!(ax2, lag[pos][i_win], r[i_win], color = :black, linewidth = 1.5, label = "Deviation: max $(round(report.result.tail_local, sigdigits = 2))")
+            Makie.lines!(ax2, lag[pos][i_win], cumsum(r[i_win] .* g_peak), color = :black, linewidth = 1.5, linestyle = :dash, label = "Integral: max $(round(report.result.tail_integral, sigdigits = 2))")
+            Makie.hlines!(ax2, [-report.tail_max, report.tail_max], color = :orange, linestyle = :dot, linewidth = 2, label = "Limit $(report.tail_max)")
+            legend_position != :none && Makie.axislegend(ax2, position = :rt, labelsize = 13, framevisible = true, framecolor = :lightgray, backgroundcolor = :white)
+            Makie.rowsize!(fig.layout, 1, Makie.Relative(0.6))
+            Makie.linkxaxes!(ax, ax2)
+            fig
+        elseif plot_type == :spectrum
+            fig = Makie.current_figure()
+            sel = findall(l -> -0.5 <= l <= 2.0, lag[order])
+            ax = Makie.Axis(fig[1,1]; title, titlesize, titlegap, xlabel = "Time (µs)", ylabel = "Amplitude / peak", limits = ((-0.5, 2.0), nothing))
+            Makie.lines!(ax, lag[order][sel], report.p[order][sel] ./ maximum(report.p), color = :black, linewidth = 2, label = "Template")
+            Makie.lines!(ax, lag[order][sel], report.g[order][sel] ./ g_peak, color = :red, linewidth = 2, linestyle = :dash, label = "Target")
+            legend_position != :none && Makie.axislegend(ax, position = :lt)
+            p0 = first(report.pulse_spectrum)
+            ax2 = Makie.Axis(fig[2,1]; xlabel = "Frequency (MHz)", ylabel = "Power per bin", xscale = Makie.log10, yscale = Makie.log10)
+            Makie.lines!(ax2, f_mhz[fpos], report.pulse_spectrum[fpos] ./ p0, color = :black, linewidth = 2, label = "Template |P|² (DC = 1)")
+            Makie.lines!(ax2, f_mhz[fpos], report.noise_spectrum[fpos] ./ p0, color = :gray, linewidth = 1.5, label = "Noise N")
+            Makie.lines!(ax2, f_mhz[fpos], report.target_spectrum[fpos], color = :red, linewidth = 2, linestyle = :dash, label = "Target |G|²")
+            legend_position != :none && Makie.axislegend(ax2, position = :lb)
+            Makie.rowsize!(fig.layout, 1, Makie.Relative(0.4))
+            fig
+        elseif plot_type == :filtered
+            fig = Makie.current_figure()
+            ax = Makie.Axis(fig[1,1]; title, titlesize, titlegap, xlabel = "Frequency (MHz)", ylabel = "Power per bin after the kernel", xscale = Makie.log10, yscale = Makie.log10)
+            Makie.lines!(ax, f_mhz[fpos], max.(report.filtered_pulse[fpos], 1e-12), color = :black, linewidth = 2, label = "Template through the kernel, λ = $(λ)")
+            Makie.lines!(ax, f_mhz[fpos], max.(report.filtered_noise[fpos], 1e-12), color = :gray, linewidth = 2, label = "Noise through the kernel: σ per sample = $(round(report.result.noise_per_sample, sigdigits = 2)) × target peak")
+            Makie.lines!(ax, f_mhz[fpos], max.(report.target_spectrum[fpos], 1e-12), color = :red, linewidth = 2, linestyle = :dash, label = "Target |G|²")
+            legend_position != :none && Makie.axislegend(ax, position = :lb)
+            fig
+        elseif plot_type == :taps
+            fig = Makie.current_figure()
+            τ = Unitful.ustrip.(u"µs", report.taps_lag)
+            ax = Makie.Axis(fig[1,1]; title, titlesize, titlegap, ylabel = "Kernel tap")
+            Makie.lines!(ax, τ, report.taps, color = :black, linewidth = 1.5, label = "$(length(report.taps)) taps, ±$(round(Unitful.ustrip(u"µs", report.result.half_length), digits = 1)) µs, sum of the response $(round(report.result.response_sum, digits = 3))")
+            legend_position != :none && Makie.axislegend(ax, position = legend_position)
+            zoom = 1.0
+            sel = findall(l -> -zoom <= l <= zoom, τ)
+            ax2 = Makie.Axis(fig[2,1]; xlabel = "Lag (µs)", ylabel = "Kernel tap", limits = ((-zoom, zoom), nothing))
+            Makie.lines!(ax2, τ[sel], report.taps[sel], color = :black, linewidth = 1.5, label = "±$(zoom) µs around lag 0")
+            legend_position != :none && Makie.axislegend(ax2, position = legend_position)
+            fig
+        elseif plot_type == :pulses
+            shaping = round(Int, Unitful.ustrip(u"ns", report.trigger_shaping))
+            fig = LegendMakie.lhist!(report.h_pulses; title, titlesize, titlegap, xlabel = "Time after trigger (µs)", ylabel = "Photons (one photon = peak 1)", colorbarlabel = "Pulses", watermark = false)
+            ax = Makie.current_axis()
+            t_p = Unitful.ustrip.(u"µs", report.t_pulses)
+            sel = findall(l -> first(t_p) <= l <= last(t_p), lag[order])
+            Makie.lines!(ax, t_p, report.pulses_median, color = :white, linewidth = 2, label = "Pulses through kernel and 4× MWA $(shaping) ns (median)")
+            Makie.lines!(ax, lag[order][sel], report.target_shaped[order][sel], color = :red, linewidth = 1.5, linestyle = :dash, label = "Target (1 photon)")
+            legend_position != :none && Makie.Legend(fig[2,1], ax; orientation = :horizontal, framevisible = false, tellheight = true, tellwidth = false)
+            fig
+        else
+            throw(ArgumentError("Unknown plot_type $plot_type, use :lambda, :response, :spectrum, :filtered, :taps or :pulses"))
+        end
+
+        # add watermarks
+        watermark && LegendMakie.add_watermarks!(; final, kwargs...)
+
+        fig
+    end
+
+
+
     # Dict of reports (vertical alignment)
     function LegendMakie.lplot!(
             reports::AbstractDict{<:Any, NamedTuple}; title::AbstractString = "", 
