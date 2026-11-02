@@ -31,7 +31,7 @@ lplot(report_simple, title = "SiPM peak search")
 # shows the mixture, its components, the peaks assigned to photoelectron numbers, and the
 # residuals.
 
-result_fit, report_fit = fit_sipm_spectrum(result_simple.pe_simple_cal, 0.5, 4.5, n_mixtures = 8, Δpe_peak_assignment = 0.5)
+result_fit, report_fit = fit_sipm_spectrum(report_simple.pe_simple_cal, 0.5, 4.5, n_mixtures = 8, Δpe_peak_assignment = 0.5)
 lplot(report_fit, xerrscaling = 5, title = "SiPM spectrum fit")
 
 # ## Calibration curve
