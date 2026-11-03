@@ -54,6 +54,7 @@ makedocs(
             "A/E" => "recipes/aoe.md",
             "LQ" => "recipes/lq.md",
             "SiPM calibration" => "recipes/sipm.md",
+            "PMT calibration" => "recipes/pmt.md",
         ],
         "API" => "api.md",
         "LICENSE" => "LICENSE.md",
