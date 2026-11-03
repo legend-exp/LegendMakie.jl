@@ -678,11 +678,11 @@ module LegendMakieLegendSpecFitsExt
         fig
     end
 
-    # plot per-event FEP residuals against qdrift, rise time and A/E at the legacy and the new optimum;
+    # plot per-event FEP residuals against qdrift and rise time at the legacy and the new optimum;
     # events beyond `residual_range` or the 0.5%-99.5% quantile range of the x variable are clamped into
     # the edge bins and their fraction is annotated per panel; non-finite events are dropped and counted; the "slowest 5%" mean covers all events
     function LegendMakie.lplot!(
-            report::NamedTuple{(:legacy, :new), <:Tuple{NamedTuple{(:residual, :qdrift, :rise_time, :aoe, :slow_mean)}, NamedTuple{(:residual, :qdrift, :rise_time, :aoe, :slow_mean)}}};
+            report::NamedTuple{(:legacy, :new), <:Tuple{NamedTuple{(:residual, :qdrift, :rise_time, :slow_mean)}, NamedTuple{(:residual, :qdrift, :rise_time, :slow_mean)}}};
             title::AbstractString = "", titlesize = 18, time_unit = u"µs", nbins::Int = 60, residual_range = (-5, 5),
             colormap = :viridis, position = "outer top", watermark::Bool = true, final::Bool = !isempty(title), kwargs...
         )
@@ -690,7 +690,7 @@ module LegendMakieLegendSpecFitsExt
         fig = Makie.current_figure()
         g = Makie.GridLayout(fig[1,1])
         yedges = range(residual_range..., length = nbins + 1)
-        variables = ((:qdrift, "Qdrift (a.u.)"), (:rise_time, "Rise time 10-90% ($time_unit)"), (:aoe, "A/E (a.u.)"))
+        variables = ((:qdrift, "Qdrift (a.u.)"), (:rise_time, "Rise time 10-90% ($time_unit)"))
 
         for (row, (var, xlabel)) in enumerate(variables)
             vals = map((report.legacy, report.new)) do r

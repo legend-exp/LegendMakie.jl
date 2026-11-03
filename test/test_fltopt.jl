@@ -64,7 +64,7 @@ report_peaks = (peaks = [:FEP, :DEP, :SEP],
 
 function fake_residuals(n)
     rise_time = (0.3 .+ rand(rng, n))u"µs"
-    (residual = randn(rng, n), qdrift = rand(rng, n) .* 100, rise_time = rise_time, aoe = 1.0 .+ 0.02 .* randn(rng, n), slow_mean = -0.2)
+    (residual = randn(rng, n), qdrift = rand(rng, n) .* 100, rise_time = rise_time, slow_mean = -0.2)
 end
 report_residuals = (legacy = fake_residuals(5000), new = fake_residuals(5000))
 
@@ -72,7 +72,7 @@ t_wf = range(0u"µs", 100u"µs", length = 1600)
 t_flt = range(20u"µs", 100u"µs", length = 1280)
 step_wf(t0) = RadiationDetectorSignals.RDWaveform(t_wf, [t < t0 ? 0.0 : 1.0 for t in t_wf] .+ 0.01 .* randn(rng, length(t_wf)))
 flt_wf(t0, width) = RadiationDetectorSignals.RDWaveform(t_flt, [abs(t - t0) < width ? 1.0 : 0.0 for t in t_flt])
-wvf_classes = [:fast, :fast, :slow, :slow, :high_aoe, :high_aoe]
+wvf_classes = [:fast, :fast, :fast, :slow, :slow, :slow]
 report_wvfs = (classes = wvf_classes,
     wvfs = [step_wf(48u"µs") for _ in wvf_classes],
     flt_legacy = [flt_wf(55u"µs", 2u"µs") for _ in wvf_classes],
@@ -124,11 +124,11 @@ report_wvfs = (classes = wvf_classes,
         n_res = 1000
         extreme(r) = merge(r, (residual = vcat(r.residual[1:n_res-4], [100.0, -100.0, 100.0, -100.0]),
             qdrift = vcat(r.qdrift[1:n_res-4], [1e6, 1e6, -1e6, -1e6]),
-            rise_time = r.rise_time[1:n_res], aoe = r.aoe[1:n_res]))
+            rise_time = r.rise_time[1:n_res]))
         extreme_report = (legacy = extreme(fake_residuals(n_res)), new = extreme(fake_residuals(n_res)))
         fig = LegendMakie.lplot(extreme_report)
         heatmaps = [p for ax in fig.content if ax isa Makie.Axis for p in ax.scene.plots if p isa Makie.Heatmap]
-        @test length(heatmaps) == 6
+        @test length(heatmaps) == 4
         @test all(hm -> sum(hm[3][]) == n_res, heatmaps)
         texts = [string(p.text[]) for ax in fig.content if ax isa Makie.Axis for p in ax.scene.plots if p isa Makie.Text]
         @test any(contains("beyond range"), texts)
