@@ -430,9 +430,11 @@ module LegendMakieLegendSpecFitsExt
             label = ifelse(show_label, "Best Fit" * (haskey(report.gof, :pvalue) ? " (p = $(round(report.gof.pvalue, digits = 2)))" : ""), nothing))
 
         if show_components
-            for (component, linestyle, label) in ((:pe1, :dash, "1 p.e."), (:pe2, :dashdot, "2 p.e."))
+            for (component, color, linestyle, label) in ((:exponential, LegendMakie.DeepCove, :dot, "Pedestal tail"),
+                                                         (:pe1, LegendMakie.AchatBlue, :dash, "1 p.e."),
+                                                         (:pe2, LegendMakie.AchatBlue, :dashdot, "2 p.e."))
                 y = report.f_components[component].(x) .* bin_width
-                Makie.lines!(ax, x, ifelse.(y .> first(ylims), y, NaN), color = LegendMakie.AchatBlue, linestyle = linestyle, linewidth = 1.5,
+                Makie.lines!(ax, x, ifelse.(y .> first(ylims), y, NaN), color = color, linestyle = linestyle, linewidth = 1.5,
                     label = ifelse(show_label, label, nothing))
             end
         end
