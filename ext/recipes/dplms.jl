@@ -112,7 +112,8 @@ function LegendMakie.lplot!(
         Makie.vlines!(ax, tp; color = LegendMakie.BEGeOrange, linestyle = :dash, linewidth = 2, label = "Pick-off")
     end
     legend_position == :none || Makie.axislegend(axs[1], position = legend_position)
-    !isempty(title) && Makie.Label(g[1, :, Makie.Top()], title, padding = (0, 0, titlegap, 0), fontsize = titlesize, font = :bold)
+    # a row of its own: the top tick label of the zoom axis reaches above the axes
+    !isempty(title) && Makie.Label(g[0, :], title, padding = (0, 0, titlegap, 0), fontsize = titlesize, font = :bold)
     Makie.current_axis!(axs[2])
     watermark && LegendMakie.add_watermarks!(; final, kwargs...)
     fig
@@ -144,7 +145,8 @@ function LegendMakie.lplot!(
     ax = Makie.Axis(g[2, 2]; xlabel = "Lag (µs)", ylabel = "Noise autocorrelation")
     Makie.hlines!(ax, 0.0; color = :gray, linestyle = :dash, linewidth = 2)
     Makie.lines!(ax, (0:(n - 1)) .* Δt, acf ./ first(acf); color = LegendMakie.ICPCBlue, linewidth = 2)
-    !isempty(title) && Makie.Label(g[1, :, Makie.Top()], title, padding = (0, 0, titlegap, 0), fontsize = titlesize, font = :bold)
+    # a row of its own: the matrix axes carry titles
+    !isempty(title) && Makie.Label(g[0, :], title, padding = (0, 0, titlegap, 0), fontsize = titlesize, font = :bold)
     Makie.current_axis!(ax)
     watermark && LegendMakie.add_watermarks!(; final, kwargs...)
     fig
