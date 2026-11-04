@@ -32,7 +32,7 @@ table_ft = TypedTables.Table(ft = e_grid_ft, status = [o ? "ok" : "fit failed" f
     tail_scale = rand(rng, n_ft)u"keV", centroid = fill(2614.0u"keV", n_ft), fct = fct_all,
     ct_spread = ct_spread_all, m_cal_simple = fill(0.01u"keV", n_ft), ctc_converged = trues(n_ft), n_events = fill(5000, n_ft))
 report_ft = (ft = Measurements.measurement(e_grid_ft[5], 0.2u"µs"), min_fwhm = fwhm_all[5], min_objective = w90_all[5],
-    objective = :w90, legacy_ft = Measurements.measurement(e_grid_ft[4], 0.2u"µs"), table = table_ft, objective_values = w90_all)
+    objective = :w90, table = table_ft, objective_values = w90_all)
 objective_ct = sqrt.(fwhm_all .^ 2 .+ (0.1 .* ct_spread_all) .^ 2)
 report_ft_ct = merge(report_ft, (objective = :fwhm_ct, min_objective = objective_ct[5], objective_values = objective_ct))
 
@@ -56,13 +56,12 @@ function fake_peak_fit(μ, σ, n)
     (h = h, f_fit = f_fit, μ = μ * u"keV", σ = σ * u"keV", fwhm = 2.355σ * u"keV", w90 = 3.29σ * u"keV", asym = 1.0)
 end
 report_peaks = (peaks = [:FEP, :DEP, :SEP],
-    legacy = [fake_peak_fit(2614.5, 1.1, 20000), fake_peak_fit(1592.5, 0.9, 3000), fake_peak_fit(2103.5, 1.0, 5000)],
-    new = [fake_peak_fit(2614.5, 1.0, 20000), fake_peak_fit(1592.5, 0.85, 3000), fake_peak_fit(2103.5, 0.95, 5000)])
+    fits = [fake_peak_fit(2614.5, 1.0, 20000), fake_peak_fit(1592.5, 0.85, 3000), fake_peak_fit(2103.5, 0.95, 5000)])
 
 function fake_residuals(n)
     (residual = randn(rng, n), qdrift = rand(rng, n) .* 100, slow_mean = -0.2)
 end
-report_residuals = (legacy = fake_residuals(5000), new = fake_residuals(5000))
+report_residuals = fake_residuals(5000)
 
 t_wf = range(0u"µs", 100u"µs", length = 1600)
 t_flt = range(20u"µs", 100u"µs", length = 1280)
@@ -71,8 +70,7 @@ flt_wf(t0, width) = RadiationDetectorSignals.RDWaveform(t_flt, [abs(t - t0) < wi
 wvf_classes = [:fast, :fast, :fast, :slow, :slow, :slow]
 report_wvfs = (classes = wvf_classes,
     wvfs = [step_wf(48u"µs") for _ in wvf_classes],
-    flt_legacy = [flt_wf(55u"µs", 2u"µs") for _ in wvf_classes],
-    flt_new = [flt_wf(56u"µs", 3u"µs") for _ in wvf_classes])
+    flt = [flt_wf(56u"µs", 3u"µs") for _ in wvf_classes])
 
 @testset "Filter optimization reports" begin
     @testset "ft scan" begin
@@ -90,7 +88,7 @@ report_wvfs = (classes = wvf_classes,
         @test_nowarn LegendMakie.lplot(report_ft_old, title = "Test")
     end
     @testset "rt/ft landscape" begin
-        @test_nowarn LegendMakie.lplot(report_rtft, legacy = (5.0u"µs", 1.8u"µs"), title = "Test", figsize = (700, 550))
+        @test_nowarn LegendMakie.lplot(report_rtft, title = "Test", figsize = (700, 550))
         @test LegendMakie.lplot(report_rtft) isa Makie.Figure
         @test LegendMakie.lplot(merge(report_rtft, (objective = :fwhm_asym, objective_values = table_rtft.fwhm .* table_rtft.asym))) isa Makie.Figure
         @test LegendMakie.lplot(merge(report_rtft, (objective = :asym, objective_values = table_rtft.asym)), legend_position = :none) isa Makie.Figure
@@ -106,9 +104,9 @@ report_wvfs = (classes = wvf_classes,
     @testset "crosscheck peaks" begin
         @test_nowarn LegendMakie.lplot(report_peaks, title = "Test", figsize = (700, 900))
         @test LegendMakie.lplot(report_peaks, yscale = identity) isa Makie.Figure
-        @test_throws DimensionMismatch LegendMakie.lplot(merge(report_peaks, (new = report_peaks.new[1:2],)))
+        @test_throws DimensionMismatch LegendMakie.lplot(merge(report_peaks, (fits = report_peaks.fits[1:2],)))
         empty_fit(f) = merge(f, (h = StatsBase.Histogram(first(f.h.edges), zeros(Int, length(f.h.weights))),))
-        report_empty = (peaks = report_peaks.peaks, legacy = empty_fit.(report_peaks.legacy), new = empty_fit.(report_peaks.new))
+        report_empty = (peaks = report_peaks.peaks, fits = empty_fit.(report_peaks.fits))
         @test LegendMakie.lplot(report_empty) isa Makie.Figure
         @test LegendMakie.lplot(report_empty, yscale = identity) isa Makie.Figure
     end
@@ -118,24 +116,24 @@ report_wvfs = (classes = wvf_classes,
         @test LegendMakie.lplot(report_residuals, position = "outer top") isa Makie.Figure
         # Events far outside both ranges are clamped into edge bins, none is lost.
         n_res = 1000
-        extreme(r) = merge(r, (residual = vcat(r.residual[1:n_res-4], [100.0, -100.0, 100.0, -100.0]),
+        r = fake_residuals(n_res)
+        extreme_report = merge(r, (residual = vcat(r.residual[1:n_res-4], [100.0, -100.0, 100.0, -100.0]),
             qdrift = vcat(r.qdrift[1:n_res-4], [1e6, 1e6, -1e6, -1e6])))
-        extreme_report = (legacy = extreme(fake_residuals(n_res)), new = extreme(fake_residuals(n_res)))
         fig = LegendMakie.lplot(extreme_report)
         heatmaps = [p for ax in fig.content if ax isa Makie.Axis for p in ax.scene.plots if p isa Makie.Heatmap]
-        @test length(heatmaps) == 2
-        @test all(hm -> sum(hm[3][]) == n_res, heatmaps)
+        @test length(heatmaps) == 1
+        @test sum(only(heatmaps)[3][]) == n_res
         texts = [string(p.text[]) for ax in fig.content if ax isa Makie.Axis for p in ax.scene.plots if p isa Makie.Text]
         @test any(contains("beyond range"), texts)
-        nan_report = (legacy = merge(report_residuals.legacy, (residual = vcat(NaN, report_residuals.legacy.residual[2:end]),)), new = report_residuals.new)
+        nan_report = merge(report_residuals, (residual = vcat(NaN, report_residuals.residual[2:end]),))
         fig = LegendMakie.lplot(nan_report)
         heatmaps = [p for ax in fig.content if ax isa Makie.Axis for p in ax.scene.plots if p isa Makie.Heatmap]
-        @test sum(heatmaps[1][3][]) == length(report_residuals.legacy.residual) - 1
+        @test sum(heatmaps[1][3][]) == length(report_residuals.residual) - 1
     end
     @testset "example waveforms" begin
         @test_nowarn LegendMakie.lplot(report_wvfs, title = "Test", figsize = (1200, 600))
         @test LegendMakie.lplot(report_wvfs) isa Makie.Figure
         @test LegendMakie.lplot(merge(report_wvfs, (wvfs = RadiationDetectorSignals.ArrayOfRDWaveforms(report_wvfs.wvfs),))) isa Makie.Figure
-        @test_throws DimensionMismatch LegendMakie.lplot(merge(report_wvfs, (flt_new = report_wvfs.flt_new[1:5],)))
+        @test_throws DimensionMismatch LegendMakie.lplot(merge(report_wvfs, (flt = report_wvfs.flt[1:5],)))
     end
 end

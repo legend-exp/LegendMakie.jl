@@ -51,17 +51,16 @@ module LegendMakieRadiationDetectorSignalsExt
         fig
     end
 
-    # one column per event class: waveforms on top, filter outputs at the legacy (dashed) and new (solid) optimum below
+    # one column per event class: waveforms on top, filter outputs at the optimum below
     function LegendMakie.lplot!(
-            report::NamedTuple{(:classes, :wvfs, :flt_legacy, :flt_new), <:Tuple{AbstractVector{Symbol},
-                AbstractVector{<:RadiationDetectorSignals.RDWaveform}, AbstractVector{<:RadiationDetectorSignals.RDWaveform},
-                AbstractVector{<:RadiationDetectorSignals.RDWaveform}}};
+            report::NamedTuple{(:classes, :wvfs, :flt), <:Tuple{AbstractVector{Symbol},
+                AbstractVector{<:RadiationDetectorSignals.RDWaveform}, AbstractVector{<:RadiationDetectorSignals.RDWaveform}}};
             xunit = Makie.Unitful.u"µs", title::AbstractString = "", titlesize = 18,
             watermark::Bool = true, final::Bool = !isempty(title), kwargs...
         )
 
-        axes(report.classes) == axes(report.wvfs) == axes(report.flt_legacy) == axes(report.flt_new) || throw(DimensionMismatch(
-            "classes, wvfs, flt_legacy and flt_new must share axes"))
+        axes(report.classes) == axes(report.wvfs) == axes(report.flt) || throw(DimensionMismatch(
+            "classes, wvfs and flt must share axes"))
 
         fig = Makie.current_figure()
         g = Makie.GridLayout(fig[1,1])
@@ -79,12 +78,10 @@ module LegendMakieRadiationDetectorSignalsExt
             for (k, i) in enumerate(members)
                 color = colors[mod1(k, length(colors))]
                 waveformplot!(ax_wf, report.wvfs[i]; color)
-                waveformplot!(ax_flt, report.flt_legacy[i]; color, linestyle = :dash, label = k == 1 ? "Legacy" : nothing)
-                waveformplot!(ax_flt, report.flt_new[i]; color, label = k == 1 ? "New" : nothing)
+                waveformplot!(ax_flt, report.flt[i]; color)
             end
             Makie.linkxaxes!(ax_wf, ax_flt)
             Makie.hidexdecorations!(ax_wf, grid = false)
-            col == 1 && Makie.axislegend(ax_flt, position = :rt)
         end
 
         if !isempty(title)
