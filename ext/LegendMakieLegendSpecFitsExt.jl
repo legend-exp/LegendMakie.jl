@@ -678,56 +678,48 @@ module LegendMakieLegendSpecFitsExt
         fig
     end
 
-    # plot per-event FEP residuals against qdrift and rise time at the legacy and the new optimum;
-    # events beyond `residual_range` or the 0.5%-99.5% quantile range of the x variable are clamped into
-    # the edge bins and their fraction is annotated per panel; non-finite events are dropped and counted; the "slowest 5%" mean covers all events
+    # plot per-event FEP residuals against qdrift at the legacy and the new optimum, best results for
+    # figsize (900, 450); events beyond `residual_range` or the 0.5%-99.5% quantile range of qdrift are
+    # clamped into the edge bins and their fraction is annotated per panel; non-finite events are dropped
+    # and counted; `slow_mean` is the mean residual of the 5% of events with the highest qdrift
     function LegendMakie.lplot!(
-            report::NamedTuple{(:legacy, :new), <:Tuple{NamedTuple{(:residual, :qdrift, :rise_time, :slow_mean)}, NamedTuple{(:residual, :qdrift, :rise_time, :slow_mean)}}};
-            title::AbstractString = "", titlesize = 18, time_unit = u"µs", nbins::Int = 60, residual_range = (-5, 5),
+            report::NamedTuple{(:legacy, :new), <:Tuple{NamedTuple{(:residual, :qdrift, :slow_mean)}, NamedTuple{(:residual, :qdrift, :slow_mean)}}};
+            title::AbstractString = "", titlesize = 18, nbins::Int = 60, residual_range = (-5, 5),
             colormap = :viridis, position = "outer top", watermark::Bool = true, final::Bool = !isempty(title), kwargs...
         )
 
         fig = Makie.current_figure()
         g = Makie.GridLayout(fig[1,1])
         yedges = range(residual_range..., length = nbins + 1)
-        variables = ((:qdrift, "Qdrift (a.u.)"), (:rise_time, "Rise time 10-90% ($time_unit)"))
 
-        for (row, (var, xlabel)) in enumerate(variables)
-            vals = map((report.legacy, report.new)) do r
-                v = getproperty(r, var)
-                eltype(v) <: Unitful.Quantity ? Unitful.ustrip.(time_unit, v) : v
-            end
-            lo, hi = StatsBase.quantile(filter(isfinite, vcat(vals...)), (0.005, 0.995))
-            xedges = range(lo, hi, length = nbins + 1)
-            for (col, (label, r, x)) in enumerate(zip(("Legacy", "New"), (report.legacy, report.new), vals))
-                # Histogram bins are left-closed, so the upper clamp value is the last float below the upper edge.
-                finite = isfinite.(x) .& isfinite.(r.residual)
-                xf, yf = x[finite], r.residual[finite]
-                xc = clamp.(xf, lo, prevfloat(hi))
-                yc = clamp.(yf, first(residual_range), prevfloat(float(last(residual_range))))
-                h = StatsBase.fit(StatsBase.Histogram, (xc, yc), (xedges, yedges))
-                f_clamped = count((xf .< lo) .| (xf .> hi) .| (yf .< first(residual_range)) .| (yf .> last(residual_range))) / length(xf)
-                n_nonfinite = count(!, finite)
-                ax = Makie.Axis(g[row, col]; xlabel, ylabel = col == 1 ? "Residual (σ)" : "",
-                    title = row == 1 ? "$label optimum" : "", titlefont = :bold, titlealign = :right)
-                hm = Makie.heatmap!(ax, xedges, yedges, h.weights, colormap = colormap)
-                col == 2 && Makie.Colorbar(g[row, 3], hm, label = "Events")
-                Makie.hlines!(ax, [0.0], color = :white, linestyle = :dash)
-                Makie.text!(ax, 0.98, 0.02, text = "$(round(100 * f_clamped, digits = 1))% beyond range" * (n_nonfinite > 0 ? "\n$n_nonfinite non-finite dropped" : ""),
-                    space = :relative, align = (:right, :bottom), color = :white, fontsize = 12)
-                if var == :rise_time
-                    Makie.text!(ax, 0.02, 0.98, text = "slowest 5%: $(round(r.slow_mean, digits = 2))σ",
-                        space = :relative, align = (:left, :top), color = :white)
-                end
-            end
+        lo, hi = StatsBase.quantile(filter(isfinite, vcat(report.legacy.qdrift, report.new.qdrift)), (0.005, 0.995))
+        xedges = range(lo, hi, length = nbins + 1)
+        for (col, (label, r)) in enumerate(zip(("Legacy", "New"), (report.legacy, report.new)))
+            # Histogram bins are left-closed, so the upper clamp value is the last float below the upper edge.
+            finite = isfinite.(r.qdrift) .& isfinite.(r.residual)
+            xf, yf = r.qdrift[finite], r.residual[finite]
+            xc = clamp.(xf, lo, prevfloat(hi))
+            yc = clamp.(yf, first(residual_range), prevfloat(float(last(residual_range))))
+            h = StatsBase.fit(StatsBase.Histogram, (xc, yc), (xedges, yedges))
+            f_clamped = count((xf .< lo) .| (xf .> hi) .| (yf .< first(residual_range)) .| (yf .> last(residual_range))) / length(xf)
+            n_nonfinite = count(!, finite)
+            ax = Makie.Axis(g[1, col]; xlabel = "Qdrift (a.u.)", ylabel = col == 1 ? "Residual (σ)" : "",
+                title = "$label optimum", titlefont = :bold, titlealign = :right)
+            hm = Makie.heatmap!(ax, xedges, yedges, h.weights, colormap = colormap)
+            col == 2 && Makie.Colorbar(g[1, 3], hm, label = "Events")
+            Makie.hlines!(ax, [0.0], color = :white, linestyle = :dash)
+            Makie.text!(ax, 0.98, 0.02, text = "$(round(100 * f_clamped, digits = 1))% beyond range" * (n_nonfinite > 0 ? "\n$n_nonfinite non-finite dropped" : ""),
+                space = :relative, align = (:right, :bottom), color = :white, fontsize = 12)
+            Makie.text!(ax, 0.02, 0.98, text = "highest 5% qdrift: $(round(r.slow_mean, digits = 2))σ",
+                space = :relative, align = (:left, :top), color = :white)
         end
 
         if !isempty(title)
             Makie.Label(g[1, :, Makie.Top()], title, padding = (0, 0, 25, 0), fontsize = titlesize, font = :bold)
         end
 
-        # the colorbars occupy the space right of the panels: the watermark sits above the
-        # top-left panel, whose title is right-aligned
+        # the colorbar occupies the space right of the panels: the watermark sits above the
+        # left panel, whose title is right-aligned
         Makie.current_axis!(first(Makie.contents(g[1, 1])))
         watermark && LegendMakie.add_watermarks!(; position, final, kwargs...)
         fig

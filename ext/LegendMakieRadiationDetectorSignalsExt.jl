@@ -51,7 +51,8 @@ module LegendMakieRadiationDetectorSignalsExt
         fig
     end
 
-    # example waveforms of the filter optimization crosscheck: one column per event class,
+    # example waveforms of the filter optimization crosscheck: one column per event class
+    # (for example :fast and :slow, the lowest and highest qdrift),
     # waveforms on top, filter outputs at the legacy (dashed) and the new (solid) optimum below
     function LegendMakie.lplot!(
             report::NamedTuple{(:classes, :wvfs, :flt_legacy, :flt_new), <:Tuple{AbstractVector{Symbol},

@@ -63,8 +63,7 @@ report_peaks = (peaks = [:FEP, :DEP, :SEP],
     new = [fake_peak_fit(2614.5, 1.0, 20000), fake_peak_fit(1592.5, 0.85, 3000), fake_peak_fit(2103.5, 0.95, 5000)])
 
 function fake_residuals(n)
-    rise_time = (0.3 .+ rand(rng, n))u"µs"
-    (residual = randn(rng, n), qdrift = rand(rng, n) .* 100, rise_time = rise_time, slow_mean = -0.2)
+    (residual = randn(rng, n), qdrift = rand(rng, n) .* 100, slow_mean = -0.2)
 end
 report_residuals = (legacy = fake_residuals(5000), new = fake_residuals(5000))
 
@@ -117,18 +116,17 @@ report_wvfs = (classes = wvf_classes,
         @test LegendMakie.lplot(report_empty, yscale = identity) isa Makie.Figure
     end
     @testset "crosscheck residuals" begin
-        @test_nowarn LegendMakie.lplot(report_residuals, title = "Test", figsize = (900, 900))
+        @test_nowarn LegendMakie.lplot(report_residuals, title = "Test", figsize = (900, 450))
         @test LegendMakie.lplot(report_residuals, nbins = 30) isa Makie.Figure
         @test LegendMakie.lplot(report_residuals, position = "outer top") isa Makie.Figure
         # Events far outside both ranges are clamped into edge bins, none is lost.
         n_res = 1000
         extreme(r) = merge(r, (residual = vcat(r.residual[1:n_res-4], [100.0, -100.0, 100.0, -100.0]),
-            qdrift = vcat(r.qdrift[1:n_res-4], [1e6, 1e6, -1e6, -1e6]),
-            rise_time = r.rise_time[1:n_res]))
+            qdrift = vcat(r.qdrift[1:n_res-4], [1e6, 1e6, -1e6, -1e6])))
         extreme_report = (legacy = extreme(fake_residuals(n_res)), new = extreme(fake_residuals(n_res)))
         fig = LegendMakie.lplot(extreme_report)
         heatmaps = [p for ax in fig.content if ax isa Makie.Axis for p in ax.scene.plots if p isa Makie.Heatmap]
-        @test length(heatmaps) == 4
+        @test length(heatmaps) == 2
         @test all(hm -> sum(hm[3][]) == n_res, heatmaps)
         texts = [string(p.text[]) for ax in fig.content if ax isa Makie.Axis for p in ax.scene.plots if p isa Makie.Text]
         @test any(contains("beyond range"), texts)
