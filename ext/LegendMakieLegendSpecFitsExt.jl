@@ -517,10 +517,8 @@ module LegendMakieLegendSpecFitsExt
         )
     end
 
-    # plot report from fit_fwhm_ft with qdrift: FWHM, W90, asymmetry and qdrift slope versus flat-top time,
-    # with the optimum of the objective and the legacy FWHM optimum marked; an objective other than
-    # `:fwhm, :w90, :asym` is overlaid on the FWHM panel; flat-top times whose
-    # fit failed (`table.status != "ok"`) are marked by gray dotted lines
+    # FWHM, W90, asymmetry and qdrift slope versus flat-top time with the new and legacy optimum;
+    # failed fits (`table.status != "ok"`) are marked by gray dotted lines
     function LegendMakie.lplot!(
             report::NamedTuple{(:ft, :min_fwhm, :min_objective, :objective, :legacy_ft, :table, :objective_values)};
             title::AbstractString = "", titlesize = 18, xunit = u"µs", e_unit = u"keV",
@@ -563,7 +561,6 @@ module LegendMakieLegendSpecFitsExt
         foreach(ax -> Makie.hidexdecorations!(ax, grid = false), axs[begin:end-1])
         Makie.linkxaxes!(axs...)
         Makie.rowgap!(g, 5)
-        # one legend below the stack, outside of the data; any `legend_position` other than :none enables it
         if legend_position != :none
             elements = [Makie.LineElement(color = :red), Makie.LineElement(color = :blue, linestyle = :dash)]
             labels = ["Optimum ($(report.objective)): $(round(ft_new, digits = 2)) $xunit", "Legacy (FWHM): $(round(ft_legacy, digits = 2)) $xunit"]
@@ -583,8 +580,7 @@ module LegendMakieLegendSpecFitsExt
         fig
     end
 
-    # plot report from optimize_rtft: every evaluated (rt, ft) colored by its objective value,
-    # failed evaluations hollow, the accepted search path, seed, optimum and optional legacy optimum
+    # evaluated (rt, ft) points colored by objective value, with search path, seed, optimum and optional legacy optimum
     function LegendMakie.lplot!(
             report::NamedTuple{(:rt, :ft, :objective, :table, :path, :objective_values)};
             legacy = nothing, title::AbstractString = "", titlesize = 18, xunit = u"µs", yunit = u"µs",
@@ -622,8 +618,7 @@ module LegendMakieLegendSpecFitsExt
             Makie.scatter!(ax, [Unitful.ustrip(xunit, Measurements.value(first(legacy)))], [Unitful.ustrip(yunit, Measurements.value(last(legacy)))],
                 marker = :xcross, color = :blue, markersize = 18, label = "Legacy")
         end
-        # colorbar and legend below the axis, outside of the data, which keeps the space right of
-        # the axis free for the watermark; any `legend_position` other than :none enables the legend
+        # colorbar and legend sit below the axis so the watermark has room on the right
         Makie.Colorbar(fig[2,1], sc, vertical = false, flipaxis = false,
             label = obj_unit == Unitful.NoUnits ? string(report.objective) : "$(report.objective) ($obj_unit)")
         legend_position != :none && Makie.Legend(fig[3,1], ax, orientation = :horizontal, framevisible = false)
@@ -633,8 +628,7 @@ module LegendMakieLegendSpecFitsExt
         fig
     end
 
-    # plot the crosscheck peaks: every peak at the legacy and the new optimum with its metrics;
-    # histograms are drawn as counts per keV so that different bin widths stay comparable
+    # one panel per crosscheck peak at the legacy and new optimum, as counts per keV
     function LegendMakie.lplot!(
             report::NamedTuple{(:peaks, :legacy, :new)};
             title::AbstractString = "", titlesize = 18, yscale = Makie.log10,
@@ -650,11 +644,9 @@ module LegendMakieLegendSpecFitsExt
 
         axs = Makie.Axis[]
         for (row, i) in enumerate(eachindex(report.peaks, report.legacy, report.new))
-            # headroom above the highest bin keeps the legend clear of the peak
             ymax = maximum(f -> maximum(f.h.weights) / step(first(f.h.edges)), (report.legacy[i], report.new[i]))
-            # an empty histogram gets a floor so that the limits stay a valid range
-            ymax > 0 || (ymax = 1.0)
-            ylims = (ylow, yscale == Makie.log10 ? 100 * ymax : 1.8 * ymax)
+            ymax > 0 || (ymax = 1.0) # empty histograms keep valid limits
+            ylims = (ylow, yscale == Makie.log10 ? 100 * ymax : 1.8 * ymax) # headroom for the legend
             ax = Makie.Axis(g[row, 1]; yscale, limits = (nothing, ylims), ylabel = "Counts / keV",
                 xlabel = "Energy (keV)", title = replace(string(report.peaks[i]), "_" => " "), titlefont = :bold)
             for (label, fit, color) in (("Legacy", report.legacy[i], :blue), ("New", report.new[i], :red))
@@ -680,10 +672,8 @@ module LegendMakieLegendSpecFitsExt
         fig
     end
 
-    # plot per-event FEP residuals against qdrift at the legacy and the new optimum, best results for
-    # figsize (900, 450); events beyond `residual_range` or the 0.5%-99.5% quantile range of qdrift are
-    # clamped into the edge bins and their fraction is annotated per panel; non-finite events are dropped
-    # and counted; `slow_mean` is the mean residual of the 5% of events with the highest qdrift
+    # 2D histogram of FEP residuals versus qdrift at the legacy and new optimum (best at figsize (900, 450));
+    # events outside `residual_range` or the 0.5%-99.5% qdrift quantiles are clamped into the edge bins
     function LegendMakie.lplot!(
             report::NamedTuple{(:legacy, :new), <:Tuple{NamedTuple{(:residual, :qdrift, :slow_mean)}, NamedTuple{(:residual, :qdrift, :slow_mean)}}};
             title::AbstractString = "", titlesize = 18, nbins::Int = 60, residual_range = (-5, 5),
@@ -697,7 +687,7 @@ module LegendMakieLegendSpecFitsExt
         lo, hi = StatsBase.quantile(filter(isfinite, vcat(report.legacy.qdrift, report.new.qdrift)), (0.005, 0.995))
         xedges = range(lo, hi, length = nbins + 1)
         for (col, (label, r)) in enumerate(zip(("Legacy", "New"), (report.legacy, report.new)))
-            # Histogram bins are left-closed, so the upper clamp value is the last float below the upper edge.
+            # bins are left-closed: clamp to the last float below the upper edge
             finite = isfinite.(r.qdrift) .& isfinite.(r.residual)
             xf, yf = r.qdrift[finite], r.residual[finite]
             xc = clamp.(xf, lo, prevfloat(hi))
@@ -720,8 +710,7 @@ module LegendMakieLegendSpecFitsExt
             Makie.Label(g[1, :, Makie.Top()], title, padding = (0, 0, 25, 0), fontsize = titlesize, font = :bold)
         end
 
-        # the colorbar occupies the space right of the panels: the watermark sits above the
-        # left panel, whose title is right-aligned
+        # the colorbar occupies the right side, so the watermark goes above the left panel
         Makie.current_axis!(first(Makie.contents(g[1, 1])))
         watermark && LegendMakie.add_watermarks!(; position, final, kwargs...)
         fig
