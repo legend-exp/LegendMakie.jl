@@ -622,49 +622,6 @@ module LegendMakieLegendSpecFitsExt
         fig
     end
 
-    # one panel per crosscheck peak, as counts per keV
-    function LegendMakie.lplot!(
-            report::NamedTuple{(:peaks, :fits)};
-            title::AbstractString = "", titlesize = 18, yscale = Makie.log10,
-            watermark::Bool = true, final::Bool = !isempty(title), kwargs...
-        )
-
-        axes(report.peaks) == axes(report.fits) || throw(DimensionMismatch(
-            "peaks and fits must share axes: $(axes(report.peaks)), $(axes(report.fits))"))
-
-        fig = Makie.current_figure()
-        g = Makie.GridLayout(fig[1,1])
-        ylow = yscale == Makie.log10 ? 0.5 : 0.0
-
-        axs = Makie.Axis[]
-        for (row, i) in enumerate(eachindex(report.peaks, report.fits))
-            fit = report.fits[i]
-            ymax = maximum(fit.h.weights) / step(first(fit.h.edges))
-            ymax > 0 || (ymax = 1.0) # empty histograms keep valid limits
-            ylims = (ylow, yscale == Makie.log10 ? 100 * ymax : 1.8 * ymax) # headroom for the legend
-            ax = Makie.Axis(g[row, 1]; yscale, limits = (nothing, ylims), ylabel = "Counts / keV",
-                xlabel = "Energy (keV)", title = replace(string(report.peaks[i]), "_" => " "), titlefont = :bold)
-            edges = first(fit.h.edges)
-            Makie.hist!(ax, StatsBase.midpoints(edges), weights = fit.h.weights ./ step(edges), bins = edges,
-                color = (:red, 0.25), fillto = ylow)
-            x = range(extrema(edges)..., length = 500)
-            Makie.lines!(ax, x, fit.f_fit.(x), color = :red,
-                label = "FWHM $(round(u"keV", Measurements.value(fit.fwhm), digits = 2)), " *
-                    "W90 $(round(u"keV", Measurements.value(fit.w90), digits = 2)), asym $(round(Measurements.value(fit.asym), digits = 3))")
-            Makie.axislegend(ax, position = :rt, labelsize = 12)
-            push!(axs, ax)
-        end
-        foreach(ax -> ax.xlabel = "", axs[begin:end-1])
-
-        if !isempty(title)
-            Makie.Label(g[1, :, Makie.Top()], title, padding = (0, 0, 25, 0), fontsize = titlesize, font = :bold)
-        end
-
-        Makie.current_axis!(last(axs))
-        watermark && LegendMakie.add_watermarks!(; final, kwargs...)
-        fig
-    end
-
     # 2D histogram of FEP residuals versus qdrift at the optimum;
     # events outside `residual_range` or the 0.5%-99.5% qdrift quantiles are clamped into the edge bins
     function LegendMakie.lplot!(
