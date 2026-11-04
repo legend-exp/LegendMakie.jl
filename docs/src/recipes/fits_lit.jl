@@ -54,8 +54,7 @@ lplot((; rt, min_enc, enc_grid_rt, enc), title = "ENC noise")
 
 # The energy resolution, the W90 width, the asymmetry and the qdrift slope as a function of the
 # flat-top time, with the optimum of the objective marked. An
-# objective other than the FWHM, W90 or asymmetry is overlaid on the FWHM panel. The
-# vectors hold the successful grid points, the table all of them:
+# objective other than the FWHM, W90 or asymmetry is overlaid on the FWHM panel:
 
 e_grid_ft = collect((0.5:0.25:5.0)u"μs")
 ok = [i != 4 for i in eachindex(e_grid_ft)]
@@ -71,9 +70,7 @@ table_ft = Table(ft = e_grid_ft, status = [o ? "ok" : "fit failed" for o in ok],
 i_best = argmin(i -> ok[i] ? ustrip(objective_all[i]) : Inf, eachindex(e_grid_ft))
 report_ft = (
     ft = measurement(e_grid_ft[i_best], 0.25u"μs"), min_fwhm = fwhm_all[i_best], min_objective = objective_all[i_best],
-    objective = :fwhm_ct,
-    e_grid_ft = e_grid_ft[ok], fwhm = fwhm_all[ok], w90 = w90_all[ok], asym = asym_all[ok], fct = fct_all[ok],
-    ct_spread = ct_spread_all[ok], objective_values = objective_all[ok], table = table_ft
+    objective = :fwhm_ct, table = table_ft, objective_values = objective_all
 )
 lplot(report_ft, title = "Flat-top time scan")
 
