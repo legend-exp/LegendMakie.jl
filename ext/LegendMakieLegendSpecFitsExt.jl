@@ -522,7 +522,7 @@ module LegendMakieLegendSpecFitsExt
     # `:fwhm, :w90, :asym` is overlaid on the FWHM panel; flat-top times whose
     # fit failed (`table.status != "ok"`) are marked by gray dotted lines
     function LegendMakie.lplot!(
-            report::NamedTuple{(:ft, :min_fwhm, :min_objective, :objective, :legacy_ft, :e_grid_ft, :fwhm, :w90, :asym, :fct, :ct_spread, :objective_values, :table)};
+            report::NamedTuple{(:ft, :min_fwhm, :min_objective, :objective, :legacy_ft, :table, :objective_values)};
             title::AbstractString = "", titlesize = 18, xunit = u"µs", e_unit = u"keV",
             legend_position = :rt, watermark::Bool = true, final::Bool = !isempty(title), kwargs...
         )
@@ -530,20 +530,22 @@ module LegendMakieLegendSpecFitsExt
         fig = Makie.current_figure()
         g = Makie.GridLayout(fig[1,1])
 
-        x = Unitful.ustrip.(xunit, Measurements.value.(report.e_grid_ft))
+        t = report.table
+        failed = t.status .!= "ok"
+        ok = .!failed
+        x = Unitful.ustrip.(xunit, Measurements.value.(t.ft[ok]))
         ft_new = Unitful.ustrip(xunit, Measurements.value(report.ft))
         ft_legacy = Unitful.ustrip(xunit, Measurements.value(report.legacy_ft))
-        failed = report.table.status .!= "ok"
-        ft_failed = Unitful.ustrip.(xunit, Measurements.value.(report.table.ft[failed]))
+        ft_failed = Unitful.ustrip.(xunit, Measurements.value.(t.ft[failed]))
         rows = (
-            ("FWHM ($e_unit)", Unitful.ustrip.(e_unit, Measurements.value.(report.fwhm))),
-            ("W90 ($e_unit)", Unitful.ustrip.(e_unit, Measurements.value.(report.w90))),
-            ("Asymmetry", Measurements.value.(report.asym)),
-            ("Qdrift slope (ADC / qdrift)", Measurements.value.(report.fct))
+            ("FWHM ($e_unit)", Unitful.ustrip.(e_unit, Measurements.value.(t.fwhm[ok]))),
+            ("W90 ($e_unit)", Unitful.ustrip.(e_unit, Measurements.value.(t.w90[ok]))),
+            ("Asymmetry", Measurements.value.(t.asym[ok])),
+            ("Qdrift slope (ADC / qdrift)", Measurements.value.(t.fct[ok]))
         )
 
         overlay = report.objective ∉ (:fwhm, :w90, :asym)
-        y_objective = Measurements.value.(report.objective_values)
+        y_objective = Measurements.value.(report.objective_values[ok])
         eltype(y_objective) <: Unitful.Quantity && (y_objective = Unitful.ustrip.(e_unit, y_objective))
         objective_label = report.objective == :fwhm_ct ? "FWHM ⊕ k · drift spread" : string(report.objective)
 

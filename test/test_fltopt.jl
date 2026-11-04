@@ -31,13 +31,10 @@ table_ft = TypedTables.Table(ft = e_grid_ft, status = [o ? "ok" : "fit failed" f
     fwhm_before = fwhm_all .+ 0.2u"keV", fwhm = fwhm_all, w90 = w90_all, asym = asym_all, tail_fraction = 0.05 .* rand(rng, n_ft),
     tail_scale = rand(rng, n_ft)u"keV", centroid = fill(2614.0u"keV", n_ft), fct = fct_all,
     ct_spread = ct_spread_all, m_cal_simple = fill(0.01u"keV", n_ft), ctc_converged = trues(n_ft), n_events = fill(5000, n_ft))
-# As produced by fit_fwhm_ft: the vectors hold the successful points only, the table all points.
 report_ft = (ft = Measurements.measurement(e_grid_ft[5], 0.2u"µs"), min_fwhm = fwhm_all[5], min_objective = w90_all[5],
-    objective = :w90, legacy_ft = Measurements.measurement(e_grid_ft[4], 0.2u"µs"), e_grid_ft = e_grid_ft[ok_ft],
-    fwhm = fwhm_all[ok_ft], w90 = w90_all[ok_ft], asym = asym_all[ok_ft], fct = fct_all[ok_ft],
-    ct_spread = ct_spread_all[ok_ft], objective_values = w90_all[ok_ft], table = table_ft)
+    objective = :w90, legacy_ft = Measurements.measurement(e_grid_ft[4], 0.2u"µs"), table = table_ft, objective_values = w90_all)
 objective_ct = sqrt.(fwhm_all .^ 2 .+ (0.1 .* ct_spread_all) .^ 2)
-report_ft_ct = merge(report_ft, (objective = :fwhm_ct, min_objective = objective_ct[5], objective_values = objective_ct[ok_ft]))
+report_ft_ct = merge(report_ft, (objective = :fwhm_ct, min_objective = objective_ct[5], objective_values = objective_ct))
 
 rts = repeat((4.0:0.5:6.0)u"µs", inner = 3)
 fts = repeat((1.8:0.2:2.2)u"µs", outer = 5)
