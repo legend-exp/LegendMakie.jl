@@ -354,21 +354,21 @@ function _fill_event_windows!(h, triggers, limits)
 end
 
 # The file key and the date of the event with the logo in the corner of the figure
-function _build_event_title!(pos)
+function _build_event_title!(pos, logo_image)
     g = Makie.GridLayout(pos, tellheight = true)
     filekey = Makie.Label(g[1, 1], " ", font = :bold, fontsize = 22, halign = :left, tellwidth = false)
     date = Makie.Label(g[1, 2], " ", font = :bold, fontsize = 22, halign = :right, tellwidth = false)
     logo = Makie.Axis(g[1, 3], width = _event_logo_size, height = _event_logo_size, aspect = Makie.DataAspect())
     Makie.hidedecorations!(logo)
     Makie.hidespines!(logo)
-    Makie.image!(logo, Makie.rotr90(FileIO.load(LegendMakie.JuleanaCircle)))
+    Makie.image!(logo, Makie.rotr90(logo_image))
     Makie.colgap!(g, 2, 12)
     (; filekey, date)
 end
 
 # The observables centered over the waveforms: the values of the event, and below them one row per
 # triggered HPGe detector
-function _build_event_observables!(pos, config; energy, aoe, lq)
+function _build_event_observables!(pos, geometric; energy, aoe, lq)
     g = Makie.GridLayout(pos, tellheight = true)
     function table(row, names; first_color = :black)
         cells = Makie.GridLayout(g[row, 1], halign = :center, tellwidth = false)
@@ -380,7 +380,7 @@ function _build_event_observables!(pos, config; energy, aoe, lq)
             value
         end
     end
-    has_geometric = !isnothing(config.geometric.name)
+    has_geometric = !isnothing(geometric.name)
     event = table(1, vcat("energy sum", "LAr PE sum", "LAr multiplicity", has_geometric ? ["geom. cut PE sum", "geom. cut multiplicity"] : String[], "LAr cut"))
     triggered = table(2, ["triggered HPGe", "string, position", string(energy), string(aoe), string(lq)]; first_color = _trigger_color)
     Makie.rowgap!(g, 6)
@@ -488,11 +488,11 @@ end
 
 # Builds the layout of the figure for the channels of `config`; the waveforms get their axes once
 # they are read
-function _build_event_display!(d::EventDisplay, array, config)
+function _build_event_display!(d::EventDisplay, array, config; logo = FileIO.load(LegendMakie.JuleanaCircle))
     empty!(d.figure)
     (; options) = d
     g = Makie.GridLayout(d.figure[1, 1])
-    title = _build_event_title!(g[1, 1:3])
+    title = _build_event_title!(g[1, 1:3], logo)
 
     left = Makie.GridLayout(g[2, 1])
     top_view = _build_event_top_view!(left[1, 1], array, config.geometric)
@@ -505,7 +505,7 @@ function _build_event_display!(d::EventDisplay, array, config)
     side_view = _build_event_side_view!(g[2, 2], array, config.geometric)
 
     right = Makie.GridLayout(g[2, 3])
-    observables = _build_event_observables!(right[1, 1], config; options.energy, options.aoe, options.lq)
+    observables = _build_event_observables!(right[1, 1], config.geometric; options.energy, options.aoe, options.lq)
     Makie.rowgap!(right, 6)
 
     Makie.colsize!(g, 1, Makie.Relative(0.35))

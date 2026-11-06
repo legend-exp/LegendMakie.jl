@@ -11,6 +11,7 @@ module LegendMakieLegendDataManagementExt
     import LegendDataTypes: decode_data
     import Makie
     import Measurements
+    import PrecompileTools
     import PropDicts
     import TypedTables
     import Unitful
@@ -448,5 +449,6 @@ module LegendMakieLegendDataManagementExt
     end
 
     include("recipes/event_display.jl")
+    include("recipes/event_display_precompile.jl")
 
 end
