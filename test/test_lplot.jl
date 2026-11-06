@@ -522,6 +522,17 @@ end
                 @test fill!(refilled, second_event...) == fill!(fresh, second_event...)
             end
 
+            # the keywords of the waveforms arrange exploded panels, also when filled from another event
+            exploded_panels(scale) = [merge(p, (; tag)) for (p, tag) in zip(vcat(panels(3, scale), panels(3, scale)[2]), ("geds: string 1", "spms: barrel IB", "spms: barrel OB"))]
+            exploded_display() = LegendMakie.eventdisplay(data; exploded = true, ncols = 2)
+            refilled = exploded_display()
+            fill!(refilled, DetId.([:V00001A]), [0.0, 0.0, 0.0, 0.0], exploded_panels(2.0))
+            image = fill!(refilled, DetId.([:V00002A, :V00003A]), [100.0, 3.0, 0.0, 0.0], exploded_panels(500.0))
+            @test image == fill!(exploded_display(), DetId.([:V00002A, :V00003A]), [100.0, 3.0, 0.0, 0.0], exploded_panels(500.0))
+            @test length(refilled.waveforms.axs) == 3
+            @test refilled.options.exploded && refilled.options.ncols == 2
+            @test !LegendMakie.eventdisplay(data).options.exploded
+
             # a new layout equals a first one, also over the remains of a build that failed
             ref = LegendMakie.eventdisplay(data)
             image = fill!(ref, many...)

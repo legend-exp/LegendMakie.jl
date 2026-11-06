@@ -75,7 +75,8 @@ Keywords:
 * `watermark = true`, `final = true`, `preliminary = true`, `approved = false`, `production = true`:
   the marks of [`add_watermarks!`](@ref) without its logo; the logo of the display is in the title row.
 * the keywords of `lplot(data, ts)` for the waveforms: `system`, `only_processable`, `filterby`,
-  `group`, `color`, `plot_tier`, `subtract_baseline`, `xunit` and `xlims`.
+  `group`, `color`, `exploded`, `ncols`, `plot_tier`, `subtract_baseline`, `xunit` and `xlims`. They
+  do not change the top and side views.
 
 With several Julia threads the waveforms are read while the other panels are filled.
 """

@@ -428,7 +428,7 @@ _panel_key(panels) = [(p.sys, p.tag, [(k, length(w)) for (k, w) in p.wvfs]) for 
 # The axes of the waveforms, with the lines of the HPGe t0 and the bands of the windows of the cut
 function _build_event_waveforms!(g, panels, options)
     grid = Makie.GridLayout(g)
-    axs, watermark_ax = _draw_event_panels!(grid, panels; exploded = false, ncols = 1, options.xlims, options.xunit)
+    axs, watermark_ax = _draw_event_panels!(grid, panels; options.exploded, options.ncols, options.xlims, options.xunit)
     series = [filter(p -> p isa Makie.Series, ax.scene.plots) for ax in axs]
     t0_lines = [Makie.vlines!(ax, [0.0], color = _trigger_color, linewidth = 1) for ax in axs]
     bands = [p.sys == :spms ? Makie.vspan!(ax, Float64[], Float64[], color = _rgba(LegendMakie.AchatBlue, 0.18)) : nothing for (ax, p) in zip(axs, panels)]
@@ -478,10 +478,10 @@ function LegendMakie.eventdisplay(data::LegendDataManagement.LegendData;
         figsize = (1800, 920), figure::Makie.Figure = Makie.Figure(size = figsize),
         system = [:geds, :spms], lar_energy = nothing, lar_cut = :geom, energy::Symbol = :e_cusp_ctc_cal, aoe::Symbol = :aoe_sg_classifier, lq::Symbol = :lq80_250025_classifier,
         pe_limits = nothing, only_processable::Bool = true, filterby = nothing, group = nothing, color::Symbol = isnothing(group) || group === false ? :amplitude : :group,
-        plot_tier = LegendDataManagement.DataTier(:raw), subtract_baseline::Bool = true, xunit::Unitful.Units = u"µs", xlims = nothing,
+        exploded::Bool = false, ncols::Int = 3, plot_tier = LegendDataManagement.DataTier(:raw), subtract_baseline::Bool = true, xunit::Unitful.Units = u"µs", xlims = nothing,
         watermark::Bool = true, final::Bool = true, preliminary::Bool = true, approved::Bool = false, production::Bool = true)
     isempty(figure.content) || throw(ArgumentError("`figure` must be empty: the event display takes the whole figure. To show another event in the same figure, fill a display: `d = eventdisplay(data); lplot!(d, evt)`"))
-    options = (; system = _system_waveforms(system), lar_energy, lar_cut, energy, aoe, lq, pe_limits, only_processable, filterby, group, color, plot_tier, subtract_baseline, xunit, xlims,
+    options = (; system = _system_waveforms(system), lar_energy, lar_cut, energy, aoe, lq, pe_limits, only_processable, filterby, group, color, exploded, ncols, plot_tier, subtract_baseline, xunit, xlims,
         watermark, final, preliminary, approved, production)
     EventDisplay(data, figure, options, nothing, @NamedTuple{radius::Float64, height::Float64}[], nothing, nothing, nothing)
 end
@@ -541,7 +541,7 @@ function LegendMakie.lplot!(d::EventDisplay, evt::NamedTuple)
 
     # All reads of the HDF5 library take its global lock and run one after the other on any number
     # of threads, so the waveforms are read by one task while the other panels are filled.
-    panels_task = Threads.@spawn _event_panels(d.data, fk, ts, options.system; options.only_processable, options.filterby, options.group, options.color, exploded = false, options.plot_tier, options.subtract_baseline)
+    panels_task = Threads.@spawn _event_panels(d.data, fk, ts, options.system; options.only_processable, options.filterby, options.group, options.color, options.exploded, options.plot_tier, options.subtract_baseline)
 
     config = _event_configuration(d.data, fk, options.lar_energy, options.lar_cut)
     rebuild = d.key != config.key
