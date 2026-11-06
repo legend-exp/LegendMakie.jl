@@ -133,3 +133,6 @@ lplot(l200, t_cal, :V99000A)
 # A timestamp is also given as a `DateTime`.
 
 lplot(l200, unix2datetime(ustrip(u"s", t_phy)), :V99000A, show_label = false)
+
+# The [event display](event_display.md) shows these waveforms together with the observables of the
+# event, the array from the top and from the side, and the SiPM triggers around the HPGe t0.

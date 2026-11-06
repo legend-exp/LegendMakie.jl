@@ -48,6 +48,7 @@ makedocs(
         "Recipes" => [
             "Histograms" => "recipes/histograms.md",
             "Waveforms and events" => "recipes/waveforms.md",
+            "Event display" => "recipes/event_display.md",
             "Parameters per detector" => "recipes/parameters.md",
             "Fits, cuts and filter optimization" => "recipes/fits.md",
             "Energy calibration" => "recipes/energy_calibration.md",
