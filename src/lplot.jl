@@ -56,7 +56,8 @@ Needs the positions of the metadata `hardware/geometry` and an event configurati
 
 The figure shows the file key and the date and time of the event, the array from the top and from
 the side, the SiPM triggers in the windows of the LAr cut around the HPGe t0, the observables of the
-event and of its triggered HPGe detectors, and the waveforms of `lplot(data, ts)`. The side view
+event and of its triggered HPGe detectors, whether it passed the LAr, muon, QC and PSD cuts, and the
+waveforms of `lplot(data, ts)`. The side view
 is unrolled around the array axis: the azimuth relative to the triggered string with the largest
 energy runs along the horizontal axis, so that no string hides another one. SiPMs with light take
 the color of their photoelectrons in the windows, and the top view adds up the SiPMs of a module;
@@ -77,6 +78,9 @@ Keywords:
 * the keywords of `lplot(data, ts)` for the waveforms: `system`, `only_processable`, `filterby`,
   `group`, `color`, `exploded`, `ncols`, `plot_tier`, `subtract_baseline`, `xunit` and `xlims`. They
   do not change the top and side views.
+* `show_empty_traces = true`: with `false`, only the waveforms of the triggered HPGe detectors and of
+  the SiPMs with light anywhere in their trace, also outside the windows of the LAr cut. A layout
+  fills in place only for an event with as many of these channels per panel as the event before.
 
 With several Julia threads the waveforms are read while the other panels are filled.
 """

@@ -144,6 +144,13 @@ function _event_lar_triggers(evt, lar_energy, lar, window_us)
     (; times, pes)
 end
 
+# The channels whose traces hold a signal, per system: the triggered HPGe detectors and the SiPMs
+# with light anywhere in their trace, also outside the windows of the LAr cut
+function _event_signal_channels(evt, lar_energy)
+    lit = [any(q -> Unitful.ustrip(q) > 0, charges) for charges in getproperty(evt.spms, lar_energy)]
+    Dict(:geds => Set(evt.geds.trig_e_det), :spms => Set(evt.spms.detector[lit]))
+end
+
 # The color scale covers at least 0.5 to 10 PE and widens to the smallest and largest light of the event
 function _event_pe_limits(array, triggers, pe_limits)
     isnothing(pe_limits) || return pe_limits
@@ -154,8 +161,8 @@ end
 # The text of a number; `Format.format` cuts a value that is not finite to the digits of `spec`
 _number_text(spec, v) = isfinite(v) ? Format.format(spec, v) : string(v)
 
-# The observables of the event as text: the values of the event, and per column the values of the
-# triggered HPGe detectors, one per line
+# The observables of the event as text: the values of the event, the decisions of its cuts, and per
+# column the values of the triggered HPGe detectors, one per line
 function _event_observable_values(evt, array, config; energy, aoe, lq)
     (; lar_energy, cut_window, geometric) = config
     sum_of(cut, col) = getproperty(evt.ged_spm, Symbol(lar_energy, "_spms_", cut, "_", col))
@@ -171,11 +178,12 @@ function _event_observable_values(evt, array, config; energy, aoe, lq)
         geometric_cut = "$(geometric.name)_$(geometric.window)"
         push!(event, pe_text(sum_of(geometric_cut, "pe_sum")), string(sum_of(geometric_cut, "multiplicity")))
     end
-    push!(event, evt.ged_spm.is_valid_lar ? "passed" : "vetoed")
+    passed_text(is_valid) = is_valid ? "passed" : "not passed"
+    cuts = [evt.ged_spm.is_valid_lar ? "passed" : "vetoed", passed_text(evt.ged_pmt.is_valid_muon), passed_text(evt.geds.is_valid_qc), passed_text(evt.geds.is_valid_psd)]
 
     triggered = [string.(evt.geds.detector[idxs]), ["$(detstring[i]), $(position[i])" for i in places],
         energy_text.(energies), _number_text.("{:.2f}", getproperty(evt.geds, aoe)[idxs]), _number_text.("{:.2f}", getproperty(evt.geds, lq)[idxs])]
-    (; event, triggered = [join(column, "\n") for column in triggered])
+    (; event, cuts, triggered = [join(column, "\n") for column in triggered])
 end
 
 # The tick values of a logarithmic color bar over `limits`
@@ -366,8 +374,8 @@ function _build_event_title!(pos, logo_image)
     (; filekey, date)
 end
 
-# The observables centered over the waveforms: the values of the event, and below them one row per
-# triggered HPGe detector
+# The observables centered over the waveforms: the values of the event, the decisions of its cuts,
+# and below them one row per triggered HPGe detector
 function _build_event_observables!(pos, geometric; energy, aoe, lq)
     g = Makie.GridLayout(pos, tellheight = true)
     function table(row, names; first_color = :black)
@@ -381,10 +389,11 @@ function _build_event_observables!(pos, geometric; energy, aoe, lq)
         end
     end
     has_geometric = !isnothing(geometric.name)
-    event = table(1, vcat("energy sum", "LAr PE sum", "LAr multiplicity", has_geometric ? ["geom. cut PE sum", "geom. cut multiplicity"] : String[], "LAr cut"))
-    triggered = table(2, ["triggered HPGe", "string, position", string(energy), string(aoe), string(lq)]; first_color = _trigger_color)
+    event = table(1, vcat("energy sum", "LAr PE sum", "LAr multiplicity", has_geometric ? ["geom. cut PE sum", "geom. cut multiplicity"] : String[]))
+    cuts = table(2, ["LAr cut", "muon cut", "QC", "PSD cut"])
+    triggered = table(3, ["triggered HPGe", "string, position", string(energy), string(aoe), string(lq)]; first_color = _trigger_color)
     Makie.rowgap!(g, 6)
-    (; event, triggered)
+    (; event, cuts, triggered)
 end
 
 # The legend of the array and the color scale of the light
@@ -422,8 +431,8 @@ function _add_event_marks!(ax; preliminary::Bool, approved::Bool, final::Bool, p
     nothing
 end
 
-# The channels and waveform columns of the panels: panels with others need new axes
-_panel_key(panels) = [(p.sys, p.tag, [(k, length(w)) for (k, w) in p.wvfs]) for p in panels]
+# The number of channels, the waveform columns and the legend of the panels: other ones need new axes
+_panel_key(panels) = [(p.sys, p.tag, [(k, length(w)) for (k, w) in p.wvfs], p.legend) for p in panels]
 
 # The axes of the waveforms, with the lines of the HPGe t0 and the bands of the windows of the cut
 function _build_event_waveforms!(g, panels, options)
@@ -479,10 +488,10 @@ function LegendMakie.eventdisplay(data::LegendDataManagement.LegendData;
         system = [:geds, :spms], lar_energy = nothing, lar_cut = :geom, energy::Symbol = :e_cusp_ctc_cal, aoe::Symbol = :aoe_sg_classifier, lq::Symbol = :lq80_250025_classifier,
         pe_limits = nothing, only_processable::Bool = true, filterby = nothing, group = nothing, color::Symbol = isnothing(group) || group === false ? :amplitude : :group,
         exploded::Bool = false, ncols::Int = 3, plot_tier = LegendDataManagement.DataTier(:raw), subtract_baseline::Bool = true, xunit::Unitful.Units = u"µs", xlims = nothing,
-        watermark::Bool = true, final::Bool = true, preliminary::Bool = true, approved::Bool = false, production::Bool = true)
+        show_empty_traces::Bool = true, watermark::Bool = true, final::Bool = true, preliminary::Bool = true, approved::Bool = false, production::Bool = true)
     isempty(figure.content) || throw(ArgumentError("`figure` must be empty: the event display takes the whole figure. To show another event in the same figure, fill a display: `d = eventdisplay(data); lplot!(d, evt)`"))
     options = (; system = _system_waveforms(system), lar_energy, lar_cut, energy, aoe, lq, pe_limits, only_processable, filterby, group, color, exploded, ncols, plot_tier, subtract_baseline, xunit, xlims,
-        watermark, final, preliminary, approved, production)
+        show_empty_traces, watermark, final, preliminary, approved, production)
     EventDisplay(data, figure, options, nothing, @NamedTuple{radius::Float64, height::Float64}[], nothing, nothing, nothing)
 end
 
@@ -524,6 +533,7 @@ function _fill_event_panels!(h, filekey, date, values, array, config, triggers, 
     h.title.filekey.text[] = filekey
     h.title.date.text[] = date
     foreach((label, text) -> label.text[] = text, h.observables.event, values.event)
+    foreach((label, text) -> label.text[] = text, h.observables.cuts, values.cuts)
     foreach((label, text) -> label.text[] = text, h.observables.triggered, values.triggered)
     _fill_event_top_view!(h.top_view, array, config.geometric, limits)
     _fill_event_side_view!(h.side_view, array, config.geometric, limits)
@@ -540,10 +550,13 @@ function LegendMakie.lplot!(d::EventDisplay, evt::NamedTuple)
     (; options) = d
 
     # All reads of the HDF5 library take its global lock and run one after the other on any number
-    # of threads, so the waveforms are read by one task while the other panels are filled.
-    panels_task = Threads.@spawn _event_panels(d.data, fk, ts, options.system; options.only_processable, options.filterby, options.group, options.color, options.exploded, options.plot_tier, options.subtract_baseline)
+    # of threads, so the waveforms are read by one task while the other panels are filled. The SiPMs
+    # with light depend on the energy type of the configuration.
+    read_panels(channels) = Threads.@spawn _event_panels(d.data, fk, ts, options.system; options.only_processable, options.filterby, options.group, options.color, options.exploded, options.plot_tier, options.subtract_baseline, channels)
+    panels_task = options.show_empty_traces ? read_panels(nothing) : nothing
 
     config = _event_configuration(d.data, fk, options.lar_energy, options.lar_cut)
+    isnothing(panels_task) && (panels_task = read_panels(_event_signal_channels(evt, config.lar_energy)))
     rebuild = d.key != config.key
     shapes = rebuild ? _detector_shapes(d.data, config.geds.detector) : d.shapes
     array = _event_array(config.geds, config.spms, shapes, evt, config.lar_energy, config.lar, config.geometric.dphi_max)

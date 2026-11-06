@@ -457,11 +457,12 @@ end
             evt = (tstart = 1.5u"s",
                 geds = (trig_e_det = DetId.([:V00002A]), trig_e_det_idxs = [2], trig_e_cusp_ctc_cal = [1000.0u"keV"], t0_start = 50.0u"μs",
                     detector = DetId.([:V00001A, :V00002A, :V00003A]), e_cusp_ctc_cal = [1.0, 1000.0, 2.0]u"keV", max_e_cusp_ctc_cal = 1000.0u"keV",
-                    aoe_sg_classifier = [0.0, -1.5, 0.0], lq80_250025_classifier = [0.0, 2.5, 0.0]),
-                spms = (trig_pos_trap = [[50.0, 51.0], [52.0], [80.0], [51.5], Float64[]] .* 1000u"ns", trig_max_trap_cal = [[2.0, 1.0], [3.0], [9.0], [4.0], Float64[]],
+                    aoe_sg_classifier = [0.0, -1.5, 0.0], lq80_250025_classifier = [0.0, 2.5, 0.0], is_valid_qc = true, is_valid_psd = false),
+                spms = (detector = DetId.([:S001, :S002, :S003, :S004, :S005]), trig_pos_trap = [[50.0, 51.0], [52.0], [80.0], [51.5], Float64[]] .* 1000u"ns", trig_max_trap_cal = [[2.0, 1.0], [3.0], [9.0], [4.0], Float64[]],
                     trig_max_trap_is_dc = [[false, false], [false], [false], [true], Bool[]]),
                 ged_spm = (is_valid_lar = false, spm = (detector = DetId.([:S001, :S002, :S003, :S004]), trig_max_trap_cal_prompt_pe_sum = [2.0, 0.0, 0.0, 0.0],
-                    trig_max_trap_cal_delayed_pe_sum = [1.0, 3.0, 0.0, 0.0])))
+                    trig_max_trap_cal_delayed_pe_sum = [1.0, 3.0, 0.0, 0.0])),
+                ged_pmt = (; is_valid_muon = true))
             array = ext._event_array(geds, spms, shapes, evt, :trig_max_trap_cal, lar, (inner = 180.0, outer = 45.0))
             @test array.main_det == DetId(:V00002A)
             @test array.detectors.triggered == [false, true, false]
@@ -507,7 +508,7 @@ end
                 isnothing(d.plots) && ext._build_event_display!(d, array, config)
                 local triggers = ext._event_lar_triggers(event, :trig_max_trap_cal, lar, (-1.5, 5.0))
                 limits = ext._event_pe_limits(array, triggers, nothing)
-                values = (event = [string(length(trig)), "1.0 PE", "2", "1.0 PE", "2", "vetoed"], triggered = [join(string.(trig), "\n"), join(string.(eachindex(trig)), "\n"), "1", "2", "3"])
+                values = (event = [string(length(trig)), "1.0 PE", "2", "1.0 PE", "2"], cuts = ["vetoed", "passed", "not passed", string(length(trig))], triggered = [join(string.(trig), "\n"), join(string.(eachindex(trig)), "\n"), "1", "2", "3"])
                 ext._fill_event_panels!(d.plots, "key", "date", values, array, config, triggers, limits)
                 isnothing(d.waveforms) && (d.waveforms = ext._build_event_waveforms!(d.waveform_grid, panel_list, d.options))
                 ext._fill_event_waveforms!(d.waveforms, panel_list, 50.0, config.windows, config.cut_window, d.options)
@@ -556,8 +557,11 @@ end
                 trig_max_trap_cal_spms_geom_prompt_pe_sum = 2.0, trig_max_trap_cal_spms_geom_prompt_multiplicity = 1))))
             observables = (; energy = :e_cusp_ctc_cal, aoe = :aoe_sg_classifier, lq = :lq80_250025_classifier)
             text = ext._event_observable_values(observed, array, windowed; observables...)
-            @test text.event == ["1000.00 keV", "6.0 PE", "2", "2.0 PE", "1", "vetoed"]
+            @test text.event == ["1000.00 keV", "6.0 PE", "2", "2.0 PE", "1"]
+            @test text.cuts == ["vetoed", "passed", "passed", "not passed"]
             @test text.triggered == ["V00002A", "1, 2", "1000.00 keV", "-1.50", "2.50"]
+            failed_cuts = merge(observed, (; ged_spm = merge(observed.ged_spm, (; is_valid_lar = true)), ged_pmt = (; is_valid_muon = false), geds = merge(observed.geds, (; is_valid_qc = false, is_valid_psd = true))))
+            @test ext._event_observable_values(failed_cuts, array, windowed; observables...).cuts == ["passed", "not passed", "not passed", "passed"]
             undefined = merge(observed, (; geds = merge(observed.geds, (; e_cusp_ctc_cal = [1.0, NaN, 2.0]u"keV", aoe_sg_classifier = [0.0, -Inf, 0.0]))))
             text = ext._event_observable_values(undefined, array, windowed; observables...)
             @test first(text.event) == "NaN keV"
@@ -578,6 +582,37 @@ end
             @test_throws "must be a row of an event tier" LegendMakie.lplot!(LegendMakie.eventdisplay(data), (a = 1,))
             no_trigger = merge(evt, (; geds = merge(evt.geds, (; trig_e_det = LegendDataManagement.DetectorId[]))))
             @test_throws "has no triggered HPGe detector" LegendMakie.lplot(data, no_trigger)
+
+            # the traces with a signal: the triggered HPGe detectors and the SiPMs with light, also a
+            # dark count and outside the windows of the LAr cut
+            channels = ext._event_signal_channels(evt, :trig_max_trap_cal)
+            @test channels[:geds] == Set(DetId.([:V00002A]))
+            @test channels[:spms] == Set(DetId.([:S001, :S002, :S003, :S004]))
+            no_charge = merge(evt, (; spms = merge(evt.spms, (; trig_max_trap_cal = [[2.0, 1.0], [0.0], [9.0], [4.0], Float64[]]))))
+            @test ext._event_signal_channels(no_charge, :trig_max_trap_cal)[:spms] == Set(DetId.([:S001, :S003, :S004]))
+            with_units = merge(evt, (; spms = merge(evt.spms, (; trig_max_trap_cal = [q .* u"C" for q in evt.spms.trig_max_trap_cal]))))
+            @test ext._event_signal_channels(with_units, :trig_max_trap_cal)[:spms] == channels[:spms]
+
+            # the panels hold the selected channels; an event can select no channel of a system
+            fk_phy = LegendDataManagement.find_filekey(data, t_phy)
+            panels_of(selected; color = :amplitude) = ext._event_panels(data, fk_phy, t_phy, Dict(:geds => [:waveform_presummed]); only_processable = true, filterby = nothing, group = nothing,
+                color, exploded = false, plot_tier = LegendDataManagement.DataTier(:raw), subtract_baseline = true, channels = selected)
+            one_detector = Dict(:geds => Set([DetId(det)]))
+            @test length(last(only(only(panels_of(one_detector)).wvfs))) == 1
+            @test length(last(only(only(panels_of(nothing)).wvfs))) > 1
+            @test length(last(only(only(panels_of(Dict(:spms => Set{DetId}()))).wvfs))) > 1
+            @test_logs min_level = Base.CoreLogging.Warn @test_throws "No channels to plot" panels_of(Dict(:geds => Set{DetId}()))
+
+            # another legend needs new axes
+            legend_panels(labels) = [(; sys = :geds, tag = "geds", wvfs = [:wf => long], legend = ("detector", labels, [:red, :blue]))]
+            @test ext._panel_key(legend_panels(["a", "b"])) == ext._panel_key(legend_panels(["a", "b"]))
+            @test ext._panel_key(legend_panels(["a", "b"])) != ext._panel_key(legend_panels(["a", "c"]))
+            @test LegendMakie.eventdisplay(data).options.show_empty_traces
+            @test !LegendMakie.eventdisplay(data; show_empty_traces = false).options.show_empty_traces
+
+            # the workload of the precompilation runs, and leaves the names of Base to Base
+            @test isnothing(ext._event_display_workload())
+            @test !any(n -> isdefined(Base, n) && getglobal(ext, n) !== getglobal(Base, n), filter(n -> isdefined(ext, n) && n in names(Base), names(ext, all = true)))
 
             # one event from a row or from a time, whose row is read from the event tier
             @test_throws "must be a row of an event tier" LegendMakie.eventdisplay(data, (a = 1,))

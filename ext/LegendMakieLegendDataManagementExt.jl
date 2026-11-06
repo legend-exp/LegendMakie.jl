@@ -184,14 +184,18 @@ module LegendMakieLegendDataManagementExt
     # The panels of the waveforms of one system for the event at time `ts`: one panel, or one per
     # group of the system when `exploded`, with the waveforms per waveform column, the color of
     # every channel per column, and the entries of a legend of the colors. The channels of a system
-    # are colored as a whole, by the signal amplitude, by their group or one by one.
-    function _system_panels(data, fk, ts, sys, wvf_columns; only_processable, filterby, group, color, exploded, plot_tier, subtract_baseline)
+    # are colored as a whole, by the signal amplitude, by their group or one by one. `channels`
+    # holds the detectors to plot per system; a system without an entry plots all of its channels.
+    function _system_panels(data, fk, ts, sys, wvf_columns; only_processable, filterby, group, color, exploded, plot_tier, subtract_baseline, channels = nothing)
         grp = _per_system(group, sys, _default_groups)
         pf = _per_system(filterby, sys, Dict())
         chinfo = LegendDataManagement.channelinfo(data, fk; system = sys, only_processable, extended = true, verbose = false)
         isnothing(pf) || (chinfo = filter(pf, chinfo))
+        selected = isnothing(channels) ? nothing : get(channels, sys, nothing)
+        isnothing(selected) || (chinfo = chinfo[in.(chinfo.detector, Ref(selected))])
         if isempty(chinfo)
-            @warn "No $(only_processable ? "processable " : "")channels found for system $sys, skipping waveform plot"
+            # an event can select no channel of a system
+            isnothing(selected) && @warn "No $(only_processable ? "processable " : "")channels found for system $sys, skipping waveform plot"
             return []
         end
         # only the row of the event is read from each channel, keyed by detector
