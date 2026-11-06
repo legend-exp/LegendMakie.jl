@@ -4,8 +4,9 @@
 # package precompilation. Nothing is read or rendered: the metadata and the data of a real event
 # are not available, and a Makie backend is not a dependency. Compiled code is only reused for the
 # same argument types, so `array`, `config.windows`, `config.geometric` and `panels` have the types
-# they have for a real event.
-PrecompileTools.@setup_workload begin
+# they have for a real event. A function keeps these names out of the globals of the module, where
+# `@setup_workload` would put them.
+function _event_display_workload()
     DetId = LegendDataManagement.DetectorId
     data = LegendDataManagement.LegendData(LegendDataManagement.SetupConfig(Pair{Vector{String}, String}[], "default"), :l200, :default)
 
@@ -20,21 +21,22 @@ PrecompileTools.@setup_workload begin
     config = (geometric = (name = :geom, window = :full, dphi_max = (inner = 180.0, outer = 45.0)),
         windows = (prompt = [-1.5, 0.5], full = [-1.5, 5.0], delayed = [0.5, 5.0]), cut_window = :full)
     triggers = (times = [0.0, 1.0], pes = [2.0, 3.0])
-    values = (event = fill("1", 6), triggered = fill("1", 5))
+    observables = (event = fill("1", 5), cuts = fill("1", 4), triggered = fill("1", 5))
     logo = fill(Makie.Colors.RGBA{Makie.Colors.N0f8}(0, 0, 0, 0), 2, 2)
 
-    time = range(0.0u"ns", step = 16.0u"ns", length = 600)
-    waveforms = RadiationDetectorSignals.ArrayOfRDWaveforms([RadiationDetectorSignals.RDWaveform(time, [k * sin(i / 10) for i in eachindex(time)]) for k in (1.0, 2.0)])
+    t = range(0.0u"ns", step = 16.0u"ns", length = 600)
+    waveforms = RadiationDetectorSignals.ArrayOfRDWaveforms([RadiationDetectorSignals.RDWaveform(t, [k * sin(i / 10) for i in eachindex(t)]) for k in (1.0, 2.0)])
     panels = [(; sys, tag = string(sys), wvfs = [column => waveforms], colors = Dict(column => get(Makie.cgrad(:coolwarm), [1.0, 2.0], :extrema)), legend = nothing)
         for (sys, column) in ((:geds, :waveform_presummed), (:spms, :waveform_bit_drop))]
 
-    PrecompileTools.@compile_workload begin
-        d = LegendMakie.eventdisplay(data)
-        array = _event_array(geds, spms, shapes, evt, :trig_max_trap_cal, lar, config.geometric.dphi_max)
-        _build_event_display!(d, array, config; logo)
-        _fill_event_panels!(d.plots, "key", _event_date(1.5u"s"), values, array, config, triggers, (0.5, 10.0))
-        d.waveforms = _build_event_waveforms!(d.waveform_grid, panels, d.options)
-        _fill_event_waveforms!(d.waveforms, panels, 4.0, config.windows, config.cut_window, d.options)
-        Base.empty!(d.figure)
-    end
+    d = LegendMakie.eventdisplay(data)
+    array = _event_array(geds, spms, shapes, evt, :trig_max_trap_cal, lar, config.geometric.dphi_max)
+    _build_event_display!(d, array, config; logo)
+    _fill_event_panels!(d.plots, "key", _event_date(1.5u"s"), observables, array, config, triggers, (0.5, 10.0))
+    d.waveforms = _build_event_waveforms!(d.waveform_grid, panels, d.options)
+    _fill_event_waveforms!(d.waveforms, panels, 4.0, config.windows, config.cut_window, d.options)
+    Base.empty!(d.figure)
+    nothing
 end
+
+PrecompileTools.@compile_workload _event_display_workload()
