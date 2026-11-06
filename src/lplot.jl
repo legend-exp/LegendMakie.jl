@@ -15,10 +15,66 @@ export LegendTheme
 
 Plots `objs` via Makie in a LEGEND-specific form/style into a new plot.
 
+    lplot(data::LegendData, evt::NamedTuple; kwargs...)
+    lplot(data::LegendData, tier::DataTier, ts::Unitful.Time; kwargs...)
+
+The event display of a physics event: `evt` is a row of an event tier, e.g. of
+`read_ldata(data, :jlevt, filekey)`, or the row at the time `ts` is read from `tier`. See
+[`eventdisplay`](@ref) for the content, the keywords and for plotting several events.
+
 """
 function lplot end
 function lplot! end
 export lplot, lplot!
+
+"""
+    eventdisplay(data::LegendData; figsize = (1800, 920), kwargs...)
+
+A figure of the event display of physics events that is filled event by event with
+`lplot!(display, evt)`, which returns the figure `display.figure`. `evt` is a row of an event tier;
+`lplot!(display, tier, ts)` reads the row at the time `ts` from `tier`. The layout is built for the
+first event and reused for the next ones, and built again for an event with other channels or
+another LAr configuration. The figure holds one event at a time: save it or copy what you need
+before the next call.
+
+```julia
+d = eventdisplay(l200)
+for i in idxs
+    save("event_\$i.png", lplot!(d, evts[i]), px_per_unit = 1.5)
+end
+```
+
+Needs the positions of the metadata `hardware/geometry` and an event configuration with the
+`windows` and `cuts` of the LAr cut. An event without a triggered HPGe detector throws an
+`ArgumentError`.
+
+The figure shows the file key and the date and time of the event, the array from the top and from
+the side, the SiPM triggers in the windows of the LAr cut around the HPGe t0, the observables of the
+event and of its triggered HPGe detectors, and the waveforms of `lplot(data, ts)`. The side view
+is unrolled around the array axis: the azimuth relative to the triggered string with the largest
+energy runs along the horizontal axis, so that no string hides another one. SiPMs with light take
+the color of their photoelectrons in the windows, and the top view adds up the SiPMs of a module;
+the edge of a SiPM marks whether it is in the geometric cut around the triggered strings.
+
+Keywords:
+* `lar_energy`: the SiPM energy type, by default the one of the column `is_valid_lar`.
+* `lar_cut = :geom`: the geometric LAr cut to show, `nothing` for none. The event tier needs the
+  columns of that cut.
+* `energy = :e_cusp_ctc_cal`, `aoe = :aoe_sg_classifier`, `lq = :lq80_250025_classifier`: the
+  columns of `evt.geds` to show per triggered HPGe detector; the energy sum adds up `energy`.
+* `pe_limits`: the limits of the color scale, by default at least 0.5 to 10 PE and wide enough for
+  the light of the event.
+* `figure`: the empty figure to fill, by default a new one of the size `figsize`. A new layout
+  clears it.
+* `watermark = true`, `final = true`, `preliminary = true`, `approved = false`, `production = true`:
+  the marks of [`add_watermarks!`](@ref) without its logo; the logo of the display is in the title row.
+* the keywords of `lplot(data, ts)` for the waveforms: `system`, `only_processable`, `filterby`,
+  `group`, `color`, `plot_tier`, `subtract_baseline`, `xunit` and `xlims`.
+
+With several Julia threads the waveforms are read while the other panels are filled.
+"""
+function eventdisplay end
+export eventdisplay
 
 
 """

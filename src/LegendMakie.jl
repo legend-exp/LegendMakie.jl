@@ -17,7 +17,8 @@ module LegendMakie
             lplot! => :Makie,
             lhist => :Makie,
             lhist! => :Makie,
-            lsavefig => :Makie
+            lsavefig => :Makie,
+            eventdisplay => :LegendDataManagement
         )
     end
 

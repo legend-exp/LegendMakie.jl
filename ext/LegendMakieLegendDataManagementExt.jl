@@ -6,6 +6,7 @@ module LegendMakieLegendDataManagementExt
     import LegendDataManagement
 
     import Dates
+    import FileIO
     import Format
     import LegendDataTypes: decode_data
     import Makie
@@ -179,6 +180,146 @@ module LegendMakieLegendDataManagementExt
         _default_waveforms[sys]
     end for sys in system)
 
+    # The panels of the waveforms of one system for the event at time `ts`: one panel, or one per
+    # group of the system when `exploded`, with the waveforms per waveform column, the color of
+    # every channel per column, and the entries of a legend of the colors. The channels of a system
+    # are colored as a whole, by the signal amplitude, by their group or one by one.
+    function _system_panels(data, fk, ts, sys, wvf_columns; only_processable, filterby, group, color, exploded, plot_tier, subtract_baseline)
+        grp = _per_system(group, sys, _default_groups)
+        pf = _per_system(filterby, sys, Dict())
+        chinfo = LegendDataManagement.channelinfo(data, fk; system = sys, only_processable, extended = true, verbose = false)
+        isnothing(pf) || (chinfo = filter(pf, chinfo))
+        if isempty(chinfo)
+            @warn "No $(only_processable ? "processable " : "")channels found for system $sys, skipping waveform plot"
+            return []
+        end
+        # only the row of the event is read from each channel, keyed by detector
+        raw = LegendDataManagement.read_ldata(_event_columns(wvf_columns, subtract_baseline), data, plot_tier, fk, [ts], chinfo.detector)
+        wvfs = [p_wvf => RadiationDetectorSignals.ArrayOfRDWaveforms([_event_waveform(tbl, p_wvf, subtract_baseline) for tbl in raw]) for p_wvf in wvf_columns]
+        groups = isnothing(grp) ? nothing : _group_values(chinfo, grp)
+        (exploded || color == :group) && isnothing(groups) && throw(ArgumentError("No grouping of the channels of system $sys, give one with `group`"))
+        colors, legend = if color == :amplitude
+            Dict(p => get(Makie.cgrad(:coolwarm), maximum.(w.signal) .- minimum.(w.signal), :extrema) for (p, w) in wvfs), nothing
+        elseif color == :group
+            vals = sort(unique(groups))
+            palette = _categorical_colors(length(vals))
+            Dict(p => palette[indexin(groups, vals)] for (p, _) in wvfs), (_group_name(grp), _group_label.(vals), palette)
+        else
+            palette = _categorical_colors(length(chinfo))
+            Dict(p => palette for (p, _) in wvfs), ("detector", string.(chinfo.detector), palette)
+        end
+        exploded || return [(; sys, tag = string(sys), wvfs, colors, legend)]
+        map(sort(unique(groups))) do v
+            sel = findall(==(v), groups)
+            # a panel of one group has no legend of the groups, and only its own channels
+            panel_legend = color == :channel ? (legend[1], legend[2][sel], legend[3][sel]) : nothing
+            (; sys, tag = "$sys: $(_group_name(grp)) $(_group_label(v))",
+                wvfs = [p => w[sel] for (p, w) in wvfs], colors = Dict(p => c[sel] for (p, c) in colors), legend = panel_legend)
+        end
+    end
+
+    # The panels of the waveforms of the event at time `ts`
+    function _event_panels(data, fk, ts, system::AbstractDict; color, exploded, group, kwargs...)
+        color in (:amplitude, :group, :channel) || throw(ArgumentError("`color` must be :amplitude, :group or :channel, got :$color"))
+        (exploded || color == :group) && isnothing(group) && (group = true)
+        panels = reduce(vcat, [_system_panels(data, fk, ts, sys, system[sys]; color, exploded, group, kwargs...) for sys in sort(collect(keys(system)))])
+        isempty(panels) && throw(ArgumentError("No channels to plot for event $ts"))
+        panels
+    end
+
+    # The segments of one stroke of a waveform: Cairo scan-converts a whole stroke at a time, which
+    # takes about a third longer for a full SiPM waveform of 6250 samples than for such pieces.
+    const _stroke_segments = 256
+
+    # The time axis and the signals, one column per waveform, of the waveforms `w` for `series!`.
+    # NaN separates the strokes of a line, and neighboring strokes share one segment, which keeps
+    # the joins between them.
+    function _series_data(w, xunit::Unitful.Units)
+        time = Unitful.ustrip.(xunit, first(w).time)
+        idxs = Int[]
+        start = firstindex(time)
+        while true
+            stop = min(start + _stroke_segments, lastindex(time))
+            append!(idxs, start:stop)
+            stop == lastindex(time) && break
+            push!(idxs, 0)
+            start = stop - 1
+        end
+        x = [i == 0 ? NaN : Float64(time[i]) for i in idxs]
+        signals = reduce(hcat, [[i == 0 ? NaN : Float64(s[i]) for i in idxs] for s in w.signal])
+        x, signals
+    end
+
+    # The time range of the germanium waveforms, or of every waveform without germanium ones
+    function _event_xlims(panels, xunit::Unitful.Units)
+        ref = filter(p -> p.sys == :geds, panels)
+        isempty(ref) && (ref = panels)
+        Unitful.ustrip.(xunit, extrema(t for p in ref for (_, w) in p.wvfs for wf in w for t in extrema(wf.time)))
+    end
+
+    # Draws `panels` into the layout `g` and returns the axes and the axis the watermarks sit beside
+    function _draw_event_panels!(g::Makie.GridLayout, panels; exploded::Bool, ncols::Int, xlims, xunit::Unitful.Units)
+        isnothing(xlims) && (xlims = _event_xlims(panels, xunit))
+
+        # the panels of a system fill `ncols` columns, each system starting a new row
+        ncols = exploded ? ncols : 1
+        pos = Tuple{Int, Int}[]
+        row = col = 0
+        for (i, p) in enumerate(panels)
+            if i == 1 || p.sys != panels[i-1].sys || col == ncols
+                row += 1
+                col = 0
+            end
+            col += 1
+            push!(pos, (row, col))
+        end
+
+        axs = map(panels, pos) do p, (r, c)
+            ax = Makie.Axis(g[r, c],
+                ytickformat = LegendMakie.linear_ticklabels,
+                palette = (color = Makie.wong_colors(),),
+                limits = (xlims ,nothing),
+                xticks = Makie.WilkinsonTicks(6,k_min=5),
+                xlabel = "Time ($xunit)", ylabel = "Signal"
+            )
+            # one line per channel
+            for (p_wvf, w) in p.wvfs
+                x, signals = _series_data(w, xunit)
+                Makie.series!(ax, x, signals', solid_color = p.colors[p_wvf])
+            end
+            if !isnothing(p.legend)
+                title, labels, palette = p.legend
+                Makie.axislegend(ax, [Makie.LineElement(color = c) for c in palette], labels, title,
+                    position = :rt, nbanks = cld(length(labels), 8), labelsize = 12, titlesize = 12, rowgap = 0, padding = 4, backgroundcolor = :white)
+            end
+            Makie.text!(ax, 0.02, 0.95, text = p.tag, space = :relative, align = (:left, :top), font = :bold, fontsize = 18)
+            ax
+        end
+
+        # the panels share the time axis and the panels of a system the signal axis; a panel
+        # with another one to its left shows no signal tick labels, one with another one of
+        # its system below it (of any system in a single column) no time tick labels
+        for (i, (r, c)) in enumerate(pos)
+            below = any(j -> pos[j] == (r + 1, c) && (!exploded || panels[j].sys == panels[i].sys), eachindex(panels))
+            below && Makie.hidexdecorations!(axs[i], grid = false, ticks = false)
+            c > 1 && Makie.hideydecorations!(axs[i], grid = false, ticks = false)
+        end
+        Makie.linkxaxes!(axs...)
+        for sys in unique(p.sys for p in panels)
+            sel = findall(p -> p.sys == sys, panels)
+            length(sel) > 1 && Makie.linkyaxes!(axs[sel]...)
+        end
+        Makie.rowgap!(g, 0)
+        Makie.colgap!(g, 0)
+
+        # align ylabels
+        left = axs[findall(((r, c),) -> c == 1, pos)]
+        yspace = maximum(Makie.tight_yticklabel_spacing!, (left...,))
+        for a in left; a.yticklabelspace = yspace; end
+
+        axs, axs[findlast(((r, c),) -> r == 1, pos)]
+    end
+
     function LegendMakie.lplot!(
             data::LegendDataManagement.LegendData, fk::LegendDataManagement.FileKey, ts::Unitful.Time{<:Real}, det::LegendDataManagement.DetectorIdLike; 
             plot_tier = LegendDataManagement.DataTier(:raw), plot_waveform = [:waveform_presummed], subtract_baseline::Bool = true,
@@ -265,123 +406,17 @@ module LegendMakieLegendDataManagementExt
             fig
 
         elseif fk.category == LegendDataManagement.DataCategory(:phy)
-            systems = sort(collect(keys(system)))
-            color in (:amplitude, :group, :channel) || throw(ArgumentError("`color` must be :amplitude, :group or :channel, got :$color"))
-            (exploded || color == :group) && isnothing(group) && (group = true)
-
-            # one panel per system, or per group of a system when exploded, with the waveforms of
-            # the event per waveform column, the color of every channel per column, and the entries
-            # of a legend of the colors. The channels of a system are colored as a whole, by the
-            # signal amplitude, by their group or one by one.
-            panels = []
-            for sys in systems
-                grp = _per_system(group, sys, _default_groups)
-                pf = _per_system(filterby, sys, Dict())
-                chinfo = LegendDataManagement.channelinfo(data, fk; system = sys, only_processable, extended = true)
-                isnothing(pf) || (chinfo = filter(pf, chinfo))
-                if isempty(chinfo)
-                    @warn "No $(only_processable ? "processable " : "")channels found for system $sys, skipping waveform plot"
-                    continue
-                end
-                # only the row of the event is read from each channel, keyed by detector
-                raw = LegendDataManagement.read_ldata(_event_columns(system[sys], subtract_baseline), data, plot_tier, fk, [ts], chinfo.detector)
-                wvfs = [p_wvf => RadiationDetectorSignals.ArrayOfRDWaveforms([_event_waveform(tbl, p_wvf, subtract_baseline) for tbl in raw]) for p_wvf in system[sys]]
-                groups = isnothing(grp) ? nothing : _group_values(chinfo, grp)
-                (exploded || color == :group) && isnothing(groups) && throw(ArgumentError("No grouping of the channels of system $sys, give one with `group`"))
-                colors, legend = if color == :amplitude
-                    Dict(p => get(Makie.cgrad(:coolwarm), maximum.(w.signal) .- minimum.(w.signal), :extrema) for (p, w) in wvfs), nothing
-                elseif color == :group
-                    vals = sort(unique(groups))
-                    palette = _categorical_colors(length(vals))
-                    Dict(p => palette[indexin(groups, vals)] for (p, _) in wvfs), (_group_name(grp), _group_label.(vals), palette)
-                else
-                    palette = _categorical_colors(length(chinfo))
-                    Dict(p => palette for (p, _) in wvfs), ("detector", string.(chinfo.detector), palette)
-                end
-                if exploded
-                    for v in sort(unique(groups))
-                        sel = findall(==(v), groups)
-                        # a panel of one group has no legend of the groups, and only its own channels
-                        panel_legend = color == :group ? nothing : color == :channel ? (legend[1], legend[2][sel], legend[3][sel]) : nothing
-                        push!(panels, (; sys, tag = "$sys: $(_group_name(grp)) $(_group_label(v))",
-                            wvfs = [p => w[sel] for (p, w) in wvfs], colors = Dict(p => c[sel] for (p, c) in colors), legend = panel_legend))
-                    end
-                else
-                    push!(panels, (; sys, tag = string(sys), wvfs, colors, legend))
-                end
-            end
-            isempty(panels) && throw(ArgumentError("No channels to plot for event $ts"))
-
-            # without limits, the time range of the germanium waveforms, or of every waveform
-            if isnothing(xlims)
-                ref = filter(p -> p.sys == :geds, panels)
-                isempty(ref) && (ref = panels)
-                xlims = Unitful.ustrip.(xunit, extrema(t for p in ref for (_, w) in p.wvfs for wf in w for t in extrema(wf.time)))
-            end
-
-            # the panels of a system fill `ncols` columns, each system starting a new row
-            ncols = exploded ? ncols : 1
-            pos = Tuple{Int, Int}[]
-            row = col = 0
-            for (i, p) in enumerate(panels)
-                if i == 1 || p.sys != panels[i-1].sys || col == ncols
-                    row += 1
-                    col = 0
-                end
-                col += 1
-                push!(pos, (row, col))
-            end
+            panels = _event_panels(data, fk, ts, system; only_processable, filterby, group, color, exploded, plot_tier, subtract_baseline)
 
             fig = Makie.current_figure()
             g = Makie.GridLayout(fig[1,1])
-            axs = map(panels, pos) do p, (r, c)
-                ax = Makie.Axis(g[r, c],
-                    ytickformat = LegendMakie.linear_ticklabels,
-                    palette = (color = Makie.wong_colors(),),
-                    limits = (xlims ,nothing),
-                    xticks = Makie.WilkinsonTicks(6,k_min=5),
-                    xlabel = "Time ($xunit)", ylabel = "Signal"
-                )
-                # one line per channel
-                for (p_wvf, w) in p.wvfs
-                    Makie.series!(ax, Unitful.ustrip.(xunit, first(w).time), stack(w.signal)', solid_color = p.colors[p_wvf])
-                end
-                if !isnothing(p.legend)
-                    title, labels, palette = p.legend
-                    Makie.axislegend(ax, [Makie.LineElement(color = c) for c in palette], labels, title,
-                        position = :rt, nbanks = cld(length(labels), 8), labelsize = 12, titlesize = 12, rowgap = 0, padding = 4, backgroundcolor = :white)
-                end
-                Makie.text!(ax, 0.02, 0.95, text = p.tag, space = :relative, align = (:left, :top), font = :bold, fontsize = 18)
-                ax
-            end
+            axs, watermark_ax = _draw_event_panels!(g, panels; exploded, ncols, xlims, xunit)
 
             runkey = "$(fk.setup)-$(fk.period)-$(fk.run)-$(fk.category)"
             show_title && Makie.Label(g[1,:,Makie.Top()], show_unixtime ? Makie.rich("$runkey - ", _event_time(ts; fontsize = 16)) : runkey,
                 padding = (0,0,36,0), fontsize = 24, font = :bold)
 
-            # the panels share the time axis and the panels of a system the signal axis; a panel
-            # with another one to its left shows no signal tick labels, one with another one of
-            # its system below it (of any system in a single column) no time tick labels
-            for (i, (r, c)) in enumerate(pos)
-                below = any(j -> pos[j] == (r + 1, c) && (!exploded || panels[j].sys == panels[i].sys), eachindex(panels))
-                below && Makie.hidexdecorations!(axs[i], grid = false, ticks = false)
-                c > 1 && Makie.hideydecorations!(axs[i], grid = false, ticks = false)
-            end
-            Makie.linkxaxes!(axs...)
-            for sys in systems
-                sel = findall(p -> p.sys == sys, panels)
-                length(sel) > 1 && Makie.linkyaxes!(axs[sel]...)
-            end
-            Makie.rowgap!(g, 0)
-            Makie.colgap!(g, 0)
-
-            # align ylabels
-            left = axs[findall(((r, c),) -> c == 1, pos)]
-            yspace = maximum(Makie.tight_yticklabel_spacing!, (left...,))
-            for a in left; a.yticklabelspace = yspace; end
-
-            # the watermarks sit beside the last panel of the first row
-            Makie.current_axis!(axs[findlast(((r, c),) -> r == 1, pos)])
+            Makie.current_axis!(watermark_ax)
             watermark && LegendMakie.add_watermarks!(; final, kwargs...)
 
             fig
@@ -411,5 +446,7 @@ module LegendMakieLegendDataManagementExt
         LegendMakie.lplot!(data, ts, det; kwargs...)
         fig
     end
+
+    include("recipes/event_display.jl")
 
 end

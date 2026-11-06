@@ -421,6 +421,154 @@ end
             @test lplot(data, t_phy, det, figsize = (800,380), xlims = (0,128), subtract_baseline = false) isa Makie.Figure
         end
 
+        @testset "Event display" begin
+            ext = Base.get_extension(LegendMakie, :LegendMakieLegendDataManagementExt)
+            DetId = LegendDataManagement.DetectorId
+
+            lar = (; spm_windows = ["prompt", "delayed"], is_valid_lar = "!trig_max_trap_cal_all_lar_cut",
+                energy_types = PropDicts.PropDict(
+                    :trig_max_trap_cal => PropDicts.PropDict(:pos => "trig_pos_trap", :is_dc => "trig_max_trap_is_dc"),
+                    :trig_max_sg_cal => PropDicts.PropDict(:pos => "trig_pos_sg", :is_dc => "trig_max_sg_is_dc")),
+                cuts = PropDicts.PropDict(
+                    :all => PropDicts.PropDict(:window => "full", :dphi_max => PropDicts.PropDict(:inner => 180.0u"°", :outer => 180.0u"°")),
+                    :geom => PropDicts.PropDict(:window => "full", :dphi_max => PropDicts.PropDict(:inner => 180.0u"°", :outer => 45.0u"°")),
+                    :geom1 => PropDicts.PropDict(:window => "prompt", :dphi_max => PropDicts.PropDict(:inner => 60.0u"°", :outer => 60.0u"°"))))
+
+            @test ext._lar_energy_type(lar) == :trig_max_trap_cal
+            @test_throws "Expected one of the energy types" ext._lar_energy_type(merge(lar, (; is_valid_lar = "!something_else")))
+            @test ext._lar_geometric_cut(lar, :geom) == (name = :geom, window = :full, dphi_max = (inner = 180.0, outer = 45.0))
+            @test ext._lar_geometric_cut(lar, :geom1) == (name = :geom1, window = :prompt, dphi_max = (inner = 60.0, outer = 60.0))
+            @test ext._lar_geometric_cut(lar, nothing) == (name = nothing, window = nothing, dphi_max = (inner = 180.0, outer = 180.0))
+            @test_throws "has no cut `geom9`" ext._lar_geometric_cut(lar, :geom9)
+
+            @test ext._wrap_degrees(190.0) == -170.0
+            @test ext._dphi_degrees(350.0, 10.0) == 20.0
+            @test ext._event_date(1.5u"s") == "1970-01-01 00:00:01.500000 UTC"
+            @test ext._event_date(1500u"ms") == "1970-01-01 00:00:01.500000 UTC"
+
+            # two strings with the azimuths 0° and 180°, a module of two SiPMs at each of them
+            # in the outer barrel and an inner SiPM at 90°; y runs against the azimuth
+            geds = TypedTables.Table(detector = DetId.([:V00001A, :V00002A, :V00003A]), detstring = [1, 1, 2], position = [1, 2, 1],
+                x = [200.0, 200.0, -200.0]u"mm", y = [0.0, 0.0, 0.0]u"mm", z = [-500.0, -600.0, -500.0]u"mm", angle = [0.0, 0.0, 180.0]u"°")
+            spms = TypedTables.Table(detector = DetId.([:S001, :S002, :S003, :S004, :S005]), barrel = [:outer, :outer, :outer, :outer, :inner],
+                x = [280.0, 280.0, -280.0, -280.0, 0.0]u"mm", y = [0.0, 0.0, 0.0, 0.0, -120.0]u"mm", z = [-30.0, -1500.0, -30.0, -1500.0, -60.0]u"mm",
+                angle = [0.0, 0.0, 180.0, 180.0, 90.0]u"°", processable = trues(5))
+            shapes = [(radius = 40.0, height = 80.0) for _ in 1:3]
+            evt = (tstart = 1.5u"s",
+                geds = (trig_e_det = DetId.([:V00002A]), trig_e_det_idxs = [2], trig_e_cusp_ctc_cal = [1000.0u"keV"], t0_start = 50.0u"μs",
+                    detector = DetId.([:V00001A, :V00002A, :V00003A]), e_cusp_ctc_cal = [1.0, 1000.0, 2.0]u"keV", max_e_cusp_ctc_cal = 1000.0u"keV",
+                    aoe_sg_classifier = [0.0, -1.5, 0.0], lq80_250025_classifier = [0.0, 2.5, 0.0]),
+                spms = (trig_pos_trap = [[50.0, 51.0], [52.0], [80.0], [51.5], Float64[]] .* 1000u"ns", trig_max_trap_cal = [[2.0, 1.0], [3.0], [9.0], [4.0], Float64[]],
+                    trig_max_trap_is_dc = [[false, false], [false], [false], [true], Bool[]]),
+                ged_spm = (is_valid_lar = false, spm = (detector = DetId.([:S001, :S002, :S003, :S004]), trig_max_trap_cal_prompt_pe_sum = [2.0, 0.0, 0.0, 0.0],
+                    trig_max_trap_cal_delayed_pe_sum = [1.0, 3.0, 0.0, 0.0])))
+            array = ext._event_array(geds, spms, shapes, evt, :trig_max_trap_cal, lar, (inner = 180.0, outer = 45.0))
+            @test array.main_det == DetId(:V00002A)
+            @test array.detectors.triggered == [false, true, false]
+            @test array.detectors.in_event == [true, true, true]
+            @test [s.triggered for s in array.strings] == [true, false]
+            @test array.sipms.pe == [3.0, 3.0, 0.0, 0.0, 0.0]
+            @test array.sipms.in_cut == [true, true, false, false, true]
+            @test array.sipms.in_event == [true, true, true, true, false]
+            @test array.sipms.dphi == [0.0, 0.0, -180.0, -180.0, 90.0]
+            @test [m.pe for m in array.modules] == [6.0, 0.0, 0.0]
+            @test array.radii == (outer = 280.0, inner = 120.0)
+
+            # a trigger counts in the window of the cut, unless it is flagged as a dark count
+            triggers = ext._event_lar_triggers(evt, :trig_max_trap_cal, lar, (-1.5, 5.0))
+            @test triggers.times == [0.0, 1.0, 2.0]
+            @test triggers.pes == [2.0, 1.0, 3.0]
+
+            # the strokes of a line share one segment and hold every sample in order
+            t_long = range(0u"μs", 100u"μs", length = 1001)
+            long = RadiationDetectorSignals.ArrayOfRDWaveforms([RadiationDetectorSignals.RDWaveform(t_long, collect(1:1001) .+ k) for k in (0, 5000)])
+            x, signals = ext._series_data(long, u"μs")
+            @test size(signals, 2) == 2
+            @test unique(filter(!isnan, signals[:, 1])) == 1:1001
+            @test filter(!isnan, signals[:, 2]) == filter(!isnan, signals[:, 1]) .+ 5000
+            @test first(x) == 0 && last(x) == 100
+            breaks = findall(isnan, x)
+            @test isnan.(signals[:, 1]) == isnan.(x)
+            @test all(b -> signals[b + 1, 1] == signals[b - 2, 1] && signals[b + 2, 1] == signals[b - 1, 1], breaks)
+            @test all(diff(vcat(0, breaks, length(x) + 1)) .<= ext._stroke_segments + 2)
+            short = RadiationDetectorSignals.ArrayOfRDWaveforms([RadiationDetectorSignals.RDWaveform(t_long[1:10], collect(1:10))])
+            @test !any(isnan, first(ext._series_data(short, u"μs")))
+
+            # a figure filled from another event equals a figure filled with this event only
+            config = (; geds, spms, lar, lar_energy = :trig_max_trap_cal, geometric = ext._lar_geometric_cut(lar, :geom), cut_window = :full, key = 1,
+                windows = (full = (-1.5, 5.0), prompt = (-1.5, 0.5), delayed = (0.5, 5.0)))
+            t_wf = range(0u"μs", 100u"μs", length = 100)
+            panels(n, scale) = [(; sys, tag = string(sys), wvfs = [:wf => RadiationDetectorSignals.ArrayOfRDWaveforms([RadiationDetectorSignals.RDWaveform(t_wf, scale .* sin.(i .* (1:100) ./ 10)) for i in 1:n])],
+                colors = Dict(:wf => fill(:red, n)), legend = nothing) for sys in (:geds, :spms)]
+            function fill!(d, trig, pe, panel_list)
+                event = merge(evt, (; geds = merge(evt.geds, (; trig_e_det = trig, trig_e_det_idxs = indexin(trig, evt.geds.detector), trig_e_cusp_ctc_cal = fill(1.0u"keV", length(trig)))),
+                    ged_spm = merge(evt.ged_spm, (; spm = merge(evt.ged_spm.spm, (; trig_max_trap_cal_delayed_pe_sum = pe))))))
+                local array = ext._event_array(geds, spms, shapes, event, :trig_max_trap_cal, lar, config.geometric.dphi_max)
+                isnothing(d.plots) && ext._build_event_display!(d, array, config)
+                local triggers = ext._event_lar_triggers(event, :trig_max_trap_cal, lar, (-1.5, 5.0))
+                limits = ext._event_pe_limits(array, triggers, nothing)
+                values = (event = [string(length(trig)), "1.0 PE", "2", "1.0 PE", "2", "vetoed"], triggered = [join(string.(trig), "\n"), join(string.(eachindex(trig)), "\n"), "1", "2", "3"])
+                ext._fill_event_panels!(d.plots, "key", "date", values, array, config, triggers, limits)
+                isnothing(d.waveforms) && (d.waveforms = ext._build_event_waveforms!(d.waveform_grid, panel_list, d.options))
+                ext._fill_event_waveforms!(d.waveforms, panel_list, 50.0, config.windows, config.cut_window, d.options)
+                Makie.colorbuffer(d.figure)
+            end
+            many = (DetId.([:V00002A, :V00003A]), [100.0, 3.0, 0.0, 0.0], panels(3, 500.0))
+            none = (DetId.([:V00001A]), [0.0, 0.0, 0.0, 0.0], panels(3, 2.0))
+            for (first_event, second_event) in ((many, none), (none, many))
+                refilled = LegendMakie.eventdisplay(data)
+                fill!(refilled, first_event...)
+                fresh = LegendMakie.eventdisplay(data)
+                @test fill!(refilled, second_event...) == fill!(fresh, second_event...)
+            end
+
+            # a new layout equals a first one, also over the remains of a build that failed
+            ref = LegendMakie.eventdisplay(data)
+            image = fill!(ref, many...)
+            ext._build_event_display!(ref, array, config)
+            @test fill!(ref, many...) == image
+            failed = LegendMakie.eventdisplay(data)
+            @test_throws ErrorException ext._build_event_display!(failed, array, merge(config, (; cut_window = :none)))
+            @test isnothing(failed.plots) && !isempty(failed.figure.content)
+            ext._build_event_display!(failed, array, config)
+            @test fill!(failed, many...) == image
+
+            # the name of a detector stays inside the side view
+            far = merge(array, (; detectors = merge(array.detectors, (; dphi = [0.0, 150.0, -170.0], triggered = [true, true, true]))))
+            ext._fill_event_side_view!(ref.plots.side_view, far, config.geometric, (0.5, 10.0))
+            @test [Makie.to_align(a) for a in ref.plots.side_view.trig_names.align[]] == Makie.to_align.([(:left, :center), (:right, :center), (:left, :center)])
+            @test [p[1] for p in ref.plots.side_view.trig_names.arg1[]] ≈ [13.46, 136.54, -156.54] atol = 0.01
+
+            # the observables read the window of each cut and show what is not finite
+            windowed = (; config..., geometric = (name = :geom, window = :prompt, dphi_max = (inner = 180.0, outer = 45.0)))
+            observed = merge(evt, (; ged_spm = merge(evt.ged_spm, (; trig_max_trap_cal_spms_full_pe_sum = 6.0, trig_max_trap_cal_spms_full_multiplicity = 2,
+                trig_max_trap_cal_spms_geom_prompt_pe_sum = 2.0, trig_max_trap_cal_spms_geom_prompt_multiplicity = 1))))
+            observables = (; energy = :e_cusp_ctc_cal, aoe = :aoe_sg_classifier, lq = :lq80_250025_classifier)
+            text = ext._event_observable_values(observed, array, windowed; observables...)
+            @test text.event == ["1000.00 keV", "6.0 PE", "2", "2.0 PE", "1", "vetoed"]
+            @test text.triggered == ["V00002A", "1, 2", "1000.00 keV", "-1.50", "2.50"]
+            undefined = merge(observed, (; geds = merge(observed.geds, (; e_cusp_ctc_cal = [1.0, NaN, 2.0]u"keV", aoe_sg_classifier = [0.0, -Inf, 0.0]))))
+            text = ext._event_observable_values(undefined, array, windowed; observables...)
+            @test first(text.event) == "NaN keV"
+            @test text.triggered[3:4] == ["NaN keV", "-Inf"]
+
+            @test ext._event_pe_limits(array, (; pes = [3.0]), nothing) == (0.5, 10.0)
+            @test ext._event_pe_limits(array, (; pes = [0.1, 300.0]), nothing) == (0.1, 300.0)
+            @test ext._event_pe_limits(array, (; pes = [3.0]), (1, 2)) == (1, 2)
+
+            # a display takes an empty figure, and a method error of a display needs no hint on loading
+            occupied = Makie.Figure()
+            Makie.Axis(occupied[1, 1])
+            @test_throws "`figure` must be empty" LegendMakie.eventdisplay(data; figure = occupied)
+            method_error = try LegendMakie.eventdisplay(1) catch e; e end
+            @test method_error isa MethodError && !occursin("to be loaded", sprint(showerror, method_error))
+
+            @test_throws "must be a row of an event tier" LegendMakie.lplot(data, (a = 1,))
+            @test_throws "must be a row of an event tier" LegendMakie.lplot!(LegendMakie.eventdisplay(data), (a = 1,))
+            no_trigger = merge(evt, (; geds = merge(evt.geds, (; trig_e_det = LegendDataManagement.DetectorId[]))))
+            @test_throws "has no triggered HPGe detector" LegendMakie.lplot(data, no_trigger)
+        end
+
         # remove test repository
         isdir(testdir) && rm(testdir, force = true, recursive = true)
     end

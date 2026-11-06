@@ -130,6 +130,19 @@ lplot(l200, t_phy, exploded = true, ncols = 2, color = :channel, figsize = (900,
 
 lplot(l200, t_cal, :V99000A)
 
+# A row of an event tier gives the event display, with the observables of the event, the array
+# from the top and from the side, the SiPM triggers around the HPGe t0 and these waveforms. It
+# needs the metadata `hardware/geometry`, which the test data of this page does not hold.
+#
+# ```julia
+# evts = read_ldata(l200, :jlevt, filekey)
+# lplot(l200, evts[i])
+# lplot(l200, DataTier(:jlevt), evts.tstart[i])  # reads only the row of the event
+#
+# d = eventdisplay(l200)                         # keeps the layout from event to event
+# lplot!(d, evts[i])
+# ```
+
 # A timestamp is also given as a `DateTime`.
 
 lplot(l200, unix2datetime(ustrip(u"s", t_phy)), :V99000A, show_label = false)
