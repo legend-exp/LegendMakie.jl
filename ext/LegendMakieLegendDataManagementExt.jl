@@ -191,13 +191,14 @@ module LegendMakieLegendDataManagementExt
         pf = _per_system(filterby, sys, Dict())
         chinfo = LegendDataManagement.channelinfo(data, fk; system = sys, only_processable, extended = true, verbose = false)
         isnothing(pf) || (chinfo = filter(pf, chinfo))
-        selected = isnothing(channels) ? nothing : get(channels, sys, nothing)
-        isnothing(selected) || (chinfo = chinfo[in.(chinfo.detector, Ref(selected))])
         if isempty(chinfo)
-            # an event can select no channel of a system
-            isnothing(selected) && @warn "No $(only_processable ? "processable " : "")channels found for system $sys, skipping waveform plot"
+            @warn "No $(only_processable ? "processable " : "")channels found for system $sys, skipping waveform plot"
             return []
         end
+        selected = isnothing(channels) ? nothing : get(channels, sys, nothing)
+        isnothing(selected) || (chinfo = chinfo[in.(chinfo.detector, Ref(selected))])
+        # an event can select no channel of a system
+        isempty(chinfo) && return []
         # only the row of the event is read from each channel, keyed by detector
         raw = LegendDataManagement.read_ldata(_event_columns(wvf_columns, subtract_baseline), data, plot_tier, fk, [ts], chinfo.detector)
         wvfs = [p_wvf => RadiationDetectorSignals.ArrayOfRDWaveforms([_event_waveform(tbl, p_wvf, subtract_baseline) for tbl in raw]) for p_wvf in wvf_columns]

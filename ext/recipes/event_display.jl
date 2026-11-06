@@ -542,7 +542,7 @@ function _fill_event_panels!(h, filekey, date, values, array, config, triggers, 
 end
 
 function LegendMakie.lplot!(d::EventDisplay, evt::NamedTuple)
-    all(k -> haskey(evt, k), (:tstart, :geds, :spms, :ged_spm)) || throw(ArgumentError("`evt` must be a row of an event tier with the columns tstart, geds, spms and ged_spm, got $(keys(evt))"))
+    all(k -> haskey(evt, k), (:tstart, :geds, :spms, :ged_spm, :ged_pmt)) || throw(ArgumentError("`evt` must be a row of an event tier with the columns tstart, geds, spms, ged_spm and ged_pmt, got $(keys(evt))"))
     ts = evt.tstart
     isempty(evt.geds.trig_e_det) && throw(ArgumentError("Event at $ts has no triggered HPGe detector: the event display shows the location of a trigger in the array"))
     fk = LegendDataManagement.find_filekey(d.data, ts)

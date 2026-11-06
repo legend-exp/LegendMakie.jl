@@ -600,8 +600,17 @@ end
             one_detector = Dict(:geds => Set([DetId(det)]))
             @test length(last(only(only(panels_of(one_detector)).wvfs))) == 1
             @test length(last(only(only(panels_of(nothing)).wvfs))) > 1
+            # a system without an entry keeps all of its channels
             @test length(last(only(only(panels_of(Dict(:spms => Set{DetId}()))).wvfs))) > 1
             @test_logs min_level = Base.CoreLogging.Warn @test_throws "No channels to plot" panels_of(Dict(:geds => Set{DetId}()))
+            # an empty selection is expected, a `filterby` without any channel is not
+            system_panels(selected; filterby = nothing) = ext._system_panels(data, fk_phy, t_phy, :geds, [:waveform_presummed]; only_processable = true, filterby, group = nothing, color = :amplitude,
+                exploded = false, plot_tier = LegendDataManagement.DataTier(:raw), subtract_baseline = true, channels = selected)
+            @test isempty(@test_logs min_level = Base.CoreLogging.Warn system_panels(Dict(:geds => Set{DetId}())))
+            @test isempty(@test_logs (:warn, r"No processable channels") system_panels(one_detector; filterby = r -> false))
+
+            # the cuts of the event need the column of the muon cut
+            @test_throws "ged_pmt" LegendMakie.lplot(data, (; evt.tstart, evt.geds, evt.spms, evt.ged_spm))
 
             # another legend needs new axes
             legend_panels(labels) = [(; sys = :geds, tag = "geds", wvfs = [:wf => long], legend = ("detector", labels, [:red, :blue]))]

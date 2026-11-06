@@ -79,8 +79,9 @@ Keywords:
   `group`, `color`, `exploded`, `ncols`, `plot_tier`, `subtract_baseline`, `xunit` and `xlims`. They
   do not change the top and side views.
 * `show_empty_traces = true`: with `false`, only the waveforms of the triggered HPGe detectors and of
-  the SiPMs with light anywhere in their trace, also outside the windows of the LAr cut. A layout
-  fills in place only for an event with as many of these channels per panel as the event before.
+  the SiPMs with light anywhere in their trace, also outside the windows of the LAr cut. Other
+  systems keep all their channels. The layout is built again for an event with another number of
+  channels in a panel or another legend.
 
 With several Julia threads the waveforms are read while the other panels are filled.
 """
