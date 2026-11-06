@@ -567,6 +567,14 @@ end
             @test_throws "must be a row of an event tier" LegendMakie.lplot!(LegendMakie.eventdisplay(data), (a = 1,))
             no_trigger = merge(evt, (; geds = merge(evt.geds, (; trig_e_det = LegendDataManagement.DetectorId[]))))
             @test_throws "has no triggered HPGe detector" LegendMakie.lplot(data, no_trigger)
+
+            # one event from a row or from a time, whose row is read from the event tier
+            @test_throws "must be a row of an event tier" LegendMakie.eventdisplay(data, (a = 1,))
+            @test_throws "has no triggered HPGe detector" LegendMakie.eventdisplay(data, no_trigger)
+            @test_throws "jlevt" LegendMakie.eventdisplay(data, t_phy)
+            @test_throws "jlevt" LegendMakie.lplot!(LegendMakie.eventdisplay(data), t_phy)
+            @test_throws "jlskm" LegendMakie.eventdisplay(data, t_phy; event_tier = :jlskm)
+            @test_throws "jlskm" LegendMakie.lplot!(LegendMakie.eventdisplay(data), t_phy; event_tier = LegendDataManagement.DataTier(:jlskm))
         end
 
         # remove test repository

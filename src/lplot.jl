@@ -28,14 +28,20 @@ function lplot! end
 export lplot, lplot!
 
 """
+    eventdisplay(data::LegendData, ts::Unitful.Time; event_tier = :jlevt, kwargs...)
+    eventdisplay(data::LegendData, evt::NamedTuple; kwargs...)
+
+The event display of one physics event, as a new figure. `ts` is the exact `tstart` of the event,
+e.g. `evts.tstart[i]`, whose row is read from `event_tier`; a time without a row is an error. `evt`
+is a row of an event tier.
+
     eventdisplay(data::LegendData; figsize = (1800, 920), kwargs...)
 
 A figure of the event display of physics events that is filled event by event with
-`lplot!(display, evt)`, which returns the figure `display.figure`. `evt` is a row of an event tier;
-`lplot!(display, tier, ts)` reads the row at the time `ts` from `tier`. The layout is built for the
-first event and reused for the next ones, and built again for an event with other channels or
-another LAr configuration. The figure holds one event at a time: save it or copy what you need
-before the next call.
+`lplot!(display, ts; event_tier = :jlevt)` or `lplot!(display, evt)`, which return the figure
+`display.figure`. The layout is built for the first event and reused for the next ones, and
+built again for an event with other channels or another LAr configuration. The figure holds one
+event at a time: save it or copy what you need before the next call.
 
 ```julia
 d = eventdisplay(l200)

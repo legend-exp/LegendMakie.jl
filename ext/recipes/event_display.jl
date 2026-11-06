@@ -582,3 +582,7 @@ _read_event(data, tier, ts) = only(LegendDataManagement.read_ldata(data, tier, L
 LegendMakie.lplot!(d::EventDisplay, tier::LegendDataManagement.DataTier, ts::Unitful.Time{<:Real}) = LegendMakie.lplot!(d, _read_event(d.data, tier, ts))
 LegendMakie.lplot!(data::LegendDataManagement.LegendData, tier::LegendDataManagement.DataTier, ts::Unitful.Time{<:Real}; kwargs...) = LegendMakie.lplot!(data, _read_event(data, tier, ts); kwargs...)
 LegendMakie.lplot(data::LegendDataManagement.LegendData, tier::LegendDataManagement.DataTier, ts::Unitful.Time{<:Real}; kwargs...) = LegendMakie.lplot(data, _read_event(data, tier, ts); kwargs...)
+LegendMakie.lplot!(d::EventDisplay, ts::Unitful.Time{<:Real}; event_tier = :jlevt) = LegendMakie.lplot!(d, LegendDataManagement.DataTier(event_tier), ts)
+
+LegendMakie.eventdisplay(data::LegendDataManagement.LegendData, evt::NamedTuple; kwargs...) = LegendMakie.lplot(data, evt; kwargs...)
+LegendMakie.eventdisplay(data::LegendDataManagement.LegendData, ts::Unitful.Time{<:Real}; event_tier = :jlevt, kwargs...) = LegendMakie.lplot(data, LegendDataManagement.DataTier(event_tier), ts; kwargs...)
