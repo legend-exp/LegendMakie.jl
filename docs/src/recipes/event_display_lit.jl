@@ -1,0 +1,163 @@
+# # Event display
+#
+# [`eventdisplay`](@ref) shows one physics event in one figure. It takes the time of the event, or
+# a row of its event tier:
+#
+# ```julia
+# l200 = LegendData(:l200)
+# evts = read_ldata(l200, :jlevt, filekey)
+#
+# eventdisplay(l200, evts.tstart[i])   # reads only the row of the event
+# eventdisplay(l200, evts[i])
+# ```
+#
+# The time must be the exact `tstart` of the event: a time without a row is an error, and a
+# `DateTime` is not accepted because its millisecond resolution cannot match `tstart`. `lplot(l200, evts[i])`
+# and `lplot(l200, DataTier(:jlevt), evts.tstart[i])` give the same figures.
+#
+# The display supports physics (`phy`) events only. An event without a triggered HPGe detector, or a
+# row without the columns `tstart`, `geds`, `spms`, `ged_spm` and `ged_pmt`, throws an `ArgumentError`.
+# The display needs:
+#
+# * the metadata `hardware/geometry`, with the position of every HPGe detector and SiPM;
+# * the `lar_cut` section of the SiPM event configuration, with the `windows`, the `spm_windows`, the
+#   `energy_types` with their `pos` and `is_dc`, and the `cuts`. A cut named `all` is required: its window
+#   is the time axis of the SiPM triggers and the window of the LAr PE sum and multiplicity.
+#
+# The array, the events and the waveforms on this page are made up. The file
+# `docs/src/recipes/event_display_data.jl` writes them into a copy of the metadata of LegendTestData,
+# and `evts` holds two event rows.
+
+using CairoMakie, LegendMakie
+include(pkgdir(LegendMakie, "docs", "src", "recipes", "event_display_data.jl")) # hide
+nothing # hide
+
+# ## An event
+
+eventdisplay(l200, evts[1])
+
+# The figure shows:
+#
+# * **Title row:** the file key, the date and time of the event in UTC, and the logo.
+# * **Top view:** the HPGe strings and the SiPM modules, with the triggered strings in orange. A SiPM
+#   module with light takes the color of its photoelectrons, added up over the module. The shaded
+#   sector is the geometric LAr cut around the triggered strings, and a blue edge marks a SiPM inside it.
+# * **SiPM triggers:** below the top view, a bar per SiPM trigger at its time relative to the HPGe t0,
+#   in the color of its photoelectrons, over the windows of the LAr cut. Triggers that the cut flags
+#   as dark counts are left out.
+# * **Side view:** the array unrolled around its axis. The horizontal axis is the azimuth relative to the
+#   triggered string with the largest energy, so no string hides another one. A white rectangle is a
+#   detector that the event does not hold, usually one that is switched off.
+# * **Observables:** the energy sum and the light of the event, its cuts, and one row per triggered HPGe
+#   detector.
+# * **Waveforms:** the waveforms of `lplot(data, ts)`, with the HPGe t0 as a vertical line and the
+#   windows of the LAr cut as bands in the SiPM panel.
+#
+# The table reads its cuts from the event tier. `true` in a column means passed:
+#
+# | Row | Column | Meaning |
+# |:----|:-------|:--------|
+# | LAr cut | `ged_spm.is_valid_lar` | The decision of the production. It does not change with the keyword `lar_cut`. |
+# | muon cut | `ged_pmt.is_valid_muon` | No flagged PMT event in the time window around the HPGe t0. Also passed when the event has no PMT event. |
+# | QC | `geds.is_valid_qc` | Every HPGe channel of the event, not only the triggered ones, is an empty trace, a single pulse or cross-talk. |
+# | PSD cut | `geds.is_valid_psd` | The triggered HPGe detectors, with the classifier of the production, which need not be the columns chosen with `aoe` and `lq`. |
+#
+# ## Several events
+#
+# `eventdisplay(l200)` returns a display without an event, which `lplot!` fills. The layout is
+# built for the first event and filled in place for the next ones, which is faster than a new
+# figure per event. It is built again for an event with other channels, another LAr configuration, or
+# other waveform panels: another number of traces in a panel, other waveform columns or another
+# legend.
+
+d = eventdisplay(l200)
+lplot!(d, evts[1])
+lplot!(d, evts[2])
+
+# This event has two triggered HPGe detectors, so the table holds two lines per column and both of
+# their strings are in the geometric cut. `lplot!(d, ts)` takes the time of an event as well, with
+# the keyword `event_tier = :jlevt`.
+#
+# The figure holds one event at a time, so save it before the next call:
+#
+# ```julia
+# d = eventdisplay(l200)
+# for i in idxs
+#     save("event_$i.png", lplot!(d, evts[i]), px_per_unit = 1.5)
+# end
+# ```
+#
+# ## Keywords
+#
+# All keywords except `event_tier` are given when the display is created, with any form of
+# `eventdisplay` or `lplot`, and hold for all events of the display. `event_tier` is given with each
+# call that takes a time. A keyword that is not listed here is an error.
+#
+# ### Figure
+#
+# | Keyword | Default | Effect |
+# |:--------|:--------|:-------|
+# | `event_tier` | `:jlevt` | The tier from which `eventdisplay(data, ts)` and `lplot!(d, ts)` read the row of the event. Only these two forms take it. |
+# | `figsize` | `(1800, 920)` | The size of a new figure. |
+# | `figure` | a new `Figure(size = figsize)` | The figure to draw into. It must be empty, otherwise the call throws an `ArgumentError`. A new layout clears it. |
+#
+# ### Observables and light
+#
+# | Keyword | Default | Effect |
+# |:--------|:--------|:-------|
+# | `energy` | `:e_cusp_ctc_cal` | The column of `evt.geds` shown per triggered detector and added up in the energy sum. The string in the center of the side view is always that of the largest `trig_e_cusp_ctc_cal`. |
+# | `aoe` | `:aoe_sg_classifier` | The column of `evt.geds` for the A/E classifier, shown per triggered detector under its name. |
+# | `lq` | `:lq80_250025_classifier` | The column of `evt.geds` for the LQ classifier, shown per triggered detector under its name. |
+# | `lar_energy` | `nothing` | The SiPM energy type of the light and the triggers, one of the `energy_types` of the LAr configuration. `nothing` takes the one named in `is_valid_lar`, and throws an `ArgumentError` if that does not name exactly one. |
+# | `lar_cut` | `:geom` | The name of the cut in the LAr configuration shown as the geometric cut: the shaded sector, the blue edges and the two table rows. A name that the configuration does not hold throws an `ArgumentError`. The event tier needs the columns of the cut, `<energy>_spms_<name>_<window>_pe_sum` and `_multiplicity` in `ged_spm`, and holds them only for a cut with `dphi_max` below 180° in a barrel, so `:all` does not work. `nothing` shows no cut: every SiPM counts as inside and has a blue edge, the shading covers the whole circle, and the bands of the side view and the two table rows are left out. |
+# | `pe_limits` | `nothing` | The limits `(low, high)` of the logarithmic color scale in photoelectrons, with `low > 0`. `nothing` covers at least 0.5 to 10 PE and widens to the light of the event. |
+#
+# ### Waveforms
+#
+# These are the keywords of `lplot(data, ts)`, see [Waveforms and events](waveforms.md). They do not
+# change the top and side views.
+#
+# | Keyword | Default | Effect |
+# |:--------|:--------|:-------|
+# | `system` | `[:geds, :spms]` | The systems to draw, as a `Symbol` or a vector. `Dict(:geds => [:waveform_presummed, :waveform_windowed])` also gives the waveform columns. Only `:geds` and `:spms` have a default column. |
+# | `show_empty_traces` | `true` | With `false`, only the waveforms of the triggered HPGe detectors and of the SiPMs with light anywhere in their trace, also outside the windows. Other systems keep all their channels. A system without such a channel gets no panel. The number of traces then usually changes from event to event, so a display rarely fills its layout in place. |
+# | `only_processable` | `true` | Only the channels marked as processable in the statuses of the run. With `false`, all channels, and a channel missing from `plot_tier` is an error. |
+# | `filterby` | `nothing` | A predicate on the rows of `channelinfo`, for example `ch -> ch.detstring == 3`, or a `Dict` with a predicate per system. A system left without channels gives a warning and is skipped. |
+# | `group` | `nothing` | The column of `channelinfo` that groups the channels, or a `Dict` with a column per system. `true` takes the string for HPGe detectors and the barrel for SiPMs, `false` is no grouping. |
+# | `color` | `:amplitude`, or `:group` with a `group` | `:amplitude` colors the channels by the height of their signal, `:group` by their group with a legend, and `:channel` one by one with a legend. |
+# | `exploded` | `false` | One panel per group, by default per string and per barrel. |
+# | `ncols` | `3` | The panels per row with `exploded`. Each system starts a new row. |
+# | `plot_tier` | `DataTier(:raw)` | The tier to read the waveforms from. |
+# | `subtract_baseline` | `true` | Subtract the FlashCam `baseline` of the trigger from each waveform. |
+# | `xunit` | `u"µs"` | The unit of the time axis. |
+# | `xlims` | `nothing` | The limits of the time axis in `xunit`. `nothing` takes the time range of the germanium waveforms. |
+#
+# For only the waveforms of a system, without the array and the table, use `lplot(l200, ts; system = :geds)`.
+# `show_empty_traces` has no effect there and gives no error.
+#
+# ### Marks
+#
+# | Keyword | Default | Effect |
+# |:--------|:--------|:-------|
+# | `watermark` | `true` | With `false`, none of the marks below. |
+# | `final` | `true` | With `true`, no tag on the waveforms. With `false`, `preliminary` and `approved` decide the tag. |
+# | `preliminary` | `true` | With `final = false`: `true` gives the tag PRELIMINARY, and `false` leaves the tag to `approved`. |
+# | `approved` | `false` | With `final = false` and `preliminary = false`: `true` gives no tag, and `false` gives the tag INTERNAL USE ONLY. |
+# | `production` | `true` | The name of the data production in the corner of the waveforms: the directory that holds the last file listed in `LEGEND_DATA_CONFIG`. Nothing is drawn if that variable is not set. |
+#
+# ## Keywords in use
+#
+# `show_empty_traces = false` keeps the traces with a signal. The SiPM panel here holds one trace
+# with a pulse outside the windows.
+
+eventdisplay(l200, evts[1], show_empty_traces = false)
+
+# `system` and `exploded` act on the waveforms only, and the array stays as it is. Here the HPGe
+# detectors take one panel per string.
+
+eventdisplay(l200, evts[1], system = :geds, exploded = true)
+
+# `lar_cut = nothing` shows no geometric cut, so all SiPMs count as inside, and `final = false` adds the
+# tag PRELIMINARY.
+
+eventdisplay(l200, evts[1], lar_cut = nothing, final = false)
