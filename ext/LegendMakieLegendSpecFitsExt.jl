@@ -521,7 +521,7 @@ module LegendMakieLegendSpecFitsExt
     # failed fits (`table.status != "ok"`) are marked by gray dotted lines
     function LegendMakie.lplot!(
             report::NamedTuple{(:ft, :min_fwhm, :min_objective, :objective, :table, :objective_values)};
-            title::AbstractString = "", titlesize = 18, xunit = u"µs", e_unit = u"keV",
+            title::AbstractString = "", titlesize = 18, xlabel::AbstractString = "Flat-Top Time", xunit = u"µs", e_unit = u"keV",
             legend_position = :rt, watermark::Bool = true, final::Bool = !isempty(title), kwargs...
         )
 
@@ -548,7 +548,7 @@ module LegendMakieLegendSpecFitsExt
 
         axs = Makie.Axis[]
         for (row, (ylabel, y)) in enumerate(rows)
-            ax = Makie.Axis(g[row, 1]; ylabel, xlabel = "Flat-Top Time ($xunit)", titlefont = :bold,
+            ax = Makie.Axis(g[row, 1]; ylabel, xlabel = "$xlabel ($xunit)", titlefont = :bold,
                 title = row == 1 ? title : "", titlesize)
             Makie.scatterlines!(ax, x, y, color = :black)
             overlay && row == 1 && Makie.scatterlines!(ax, x, y_objective, color = :orange, marker = :utriangle)

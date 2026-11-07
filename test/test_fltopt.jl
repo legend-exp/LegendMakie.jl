@@ -68,6 +68,8 @@ report_wvfs = (classes = wvf_classes,
         @test_nowarn LegendMakie.lplot(report_ft, title = "Test", figsize = (600, 900))
         @test LegendMakie.lplot(report_ft, figsize = (600, 900)) isa Makie.Figure
         @test LegendMakie.lplot(report_ft, legend_position = :none, watermark = false) isa Makie.Figure
+        fig = LegendMakie.lplot(report_ft, xlabel = "Flat-Top Widening ff", watermark = false)
+        @test all(ax -> ax.xlabel[] == "Flat-Top Widening ff ($(u"µs"))", filter(x -> x isa Makie.Axis, fig.content))
         @test_nowarn LegendMakie.lplot(report_ft_ct, title = "Test", figsize = (600, 900))
         @test LegendMakie.lplot(report_ft_ct, legend_position = :none) isa Makie.Figure
         @test LegendMakie.lplot(merge(report_ft, (table = TypedTables.Table(merge(TypedTables.columns(table_ft), (status = fill("ok", n_ft),))),))) isa Makie.Figure
