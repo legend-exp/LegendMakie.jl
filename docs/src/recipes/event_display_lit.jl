@@ -45,15 +45,22 @@ eventdisplay(l200, evts[1])
 # * **SiPM triggers:** below the top view, a bar per SiPM trigger at its time relative to the HPGe t0,
 #   in the color of its photoelectrons, over the windows of the LAr cut. Triggers that the cut flags
 #   as dark counts are left out.
+# * **Color bar:** the classes of the light in photoelectrons (PE), the same for every event: one
+#   class each for up to 1, 2 and 3 PE, then 4–5, 6–10 and more than 10 PE. A class ends halfway
+#   between two whole numbers, at 1.5, 2.5, 3.5, 5.5 and 10.5 PE.
 # * **Side view:** the array unrolled around its axis. The horizontal axis is the azimuth relative to the
-#   triggered string with the largest energy, so no string hides another one. A white rectangle is a
-#   detector that the event does not hold, usually one that is switched off.
+#   triggered string with the largest energy, so no string hides another one. All strings hang from
+#   one height: each string is shifted so that the top of its highest detector is level with the
+#   highest one of the array, and the distances within a string are those of the metadata. The SiPMs
+#   are at their heights in the metadata. A white rectangle is a detector that the event does not
+#   hold, usually one that is switched off.
 # * **Observables:** the energy sum and the light of the event, its cuts, and one row per triggered HPGe
 #   detector.
 # * **Waveforms:** the waveforms of `lplot(data, ts)`, with the HPGe t0 as a vertical line and the
 #   windows of the LAr cut as bands in the SiPM panel.
 #
-# The table reads its cuts from the event tier. `true` in a column means passed:
+# The table reads its cuts from the event tier, by default from these columns. `true` in a column
+# means passed:
 #
 # | Row | Column | Meaning |
 # |:----|:-------|:--------|
@@ -61,6 +68,9 @@ eventdisplay(l200, evts[1])
 # | muon cut | `ged_pmt.is_valid_muon` | No flagged PMT event in the time window around the HPGe t0. Also passed when the event has no PMT event. |
 # | QC | `geds.is_valid_qc` | Every HPGe channel of the event, not only the triggered ones, is an empty trace, a single pulse or cross-talk. |
 # | PSD cut | `geds.is_valid_psd` | The triggered HPGe detectors, with the classifier of the production, which need not be the columns chosen with `aoe` and `lq`. |
+#
+# The keyword `cuts` takes other columns of the same sub-tables: `cuts = (; psd = col)` takes the
+# PSD row from the column `geds.col`, see the keywords below.
 #
 # ## Several events
 #
@@ -108,9 +118,9 @@ lplot!(d, evts[2])
 # | `energy` | `:e_cusp_ctc_cal` | The column of `evt.geds` shown per triggered detector and added up in the energy sum. The string in the center of the side view is always that of the largest `trig_e_cusp_ctc_cal`. |
 # | `aoe` | `:aoe_sg_classifier` | The column of `evt.geds` for the A/E classifier, shown per triggered detector under its name. |
 # | `lq` | `:lq80_250025_classifier` | The column of `evt.geds` for the LQ classifier, shown per triggered detector under its name. |
+# | `cuts` | `(;)` | The columns of the cut rows, as a `NamedTuple` with the rows `lar`, `muon`, `qc` and `psd`. The row `lar` reads `ged_spm`, `muon` reads `ged_pmt`, and `qc` and `psd` read `geds`. A row that is not given keeps its column of the table above. A row with another column is named after the column. A row that the table does not have, a column that the event does not hold, or a column that is not one `Bool` per event throws an `ArgumentError`. |
 # | `lar_energy` | `nothing` | The SiPM energy type of the light and the triggers, one of the `energy_types` of the LAr configuration. `nothing` takes the one named in `is_valid_lar`, and throws an `ArgumentError` if that does not name exactly one. |
 # | `lar_cut` | `:geom` | The name of the cut in the LAr configuration shown as the geometric cut: the shaded sector, the blue edges and the two table rows. A name that the configuration does not hold throws an `ArgumentError`. The event tier needs the columns of the cut, `<energy>_spms_<name>_<window>_pe_sum` and `_multiplicity` in `ged_spm`, and holds them only for a cut with `dphi_max` below 180° in a barrel, so `:all` does not work. `nothing` shows no cut: every SiPM counts as inside and has a blue edge, the shading covers the whole circle, and the bands of the side view and the two table rows are left out. |
-# | `pe_limits` | `nothing` | The limits `(low, high)` of the logarithmic color scale in photoelectrons, with `low > 0`. `nothing` covers at least 0.5 to 10 PE and widens to the light of the event. |
 #
 # ### Waveforms
 #

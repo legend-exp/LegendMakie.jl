@@ -6,7 +6,15 @@ const _string_edge_color = "#B8BEC8"
 const _detector_color = "#D5D9E0"
 const _outside_cut_color = "#7A8088"
 const _absent_sipm_color = "#D8DBE0"
-const _lar_colormap = :plasma
+# The classes of the light of a SiPM or a pulse in photoelectrons (PE), one color each. A class ends
+# at its edge in `_pe_edges`; light below the first edge is in the first class, light from the last
+# edge on in the last one. The edges lie halfway between whole numbers, so that 1, 2 and 3 PE, the
+# most frequent light, have a class each. Neighboring classes stay apart for color-blind readers,
+# and every class has a hue, so that it differs from white (no light) and from the gray of an
+# absent SiPM.
+const _pe_edges = [1.5, 2.5, 3.5, 5.5, 10.5]
+const _pe_labels = ["≤ 1", "2", "3", "4–5", "6–10", "> 10"]
+const _pe_colors = Makie.RGBAf.(Makie.to_color.(["#7B4DFF", "#22C55E", "#FACC15", "#FF6FAE", "#E8212E", "#8E0A2A"]))
 
 # The side of the logo in the title row, in pixels of the figure
 const _event_logo_size = 56
@@ -78,8 +86,10 @@ end
 
 # The layout of the HPGe detectors and SiPMs in the array for a row `evt` of the event tier: every
 # position in mm and azimuth in degrees, the HPGe detectors that triggered and the light of each
-# SiPM in the windows of the LAr cut, in photoelectrons. The `z` of a detector is the center of its
-# crystal, so a string starts where the rod length and the height of its top detector put it.
+# SiPM in the windows of the LAr cut, in photoelectrons. The `z` of a detector in the metadata is the
+# center of its crystal. The side view hangs all strings from one height: `side_z` shifts the
+# detectors of a string so that the top of its highest detector is level with the highest one of
+# the array, and keeps the distances within the string. The SiPMs stay at their `z`.
 function _event_array(geds, spms, shapes, evt, lar_energy, lar, dphi_max)
     trig_dets = collect(evt.geds.trig_e_det)
     all(in(geds.detector), trig_dets) || throw(ArgumentError("Triggered detector $(setdiff(trig_dets, geds.detector)) not in the channel information"))
@@ -91,14 +101,17 @@ function _event_array(geds, spms, shapes, evt, lar_energy, lar, dphi_max)
     det_angles = Unitful.ustrip.(u"°", geds.angle)
     x, y, z = Unitful.ustrip.(u"mm", geds.x), Unitful.ustrip.(u"mm", geds.y), Unitful.ustrip.(u"mm", geds.z)
     triggered = geds.detector .∈ Ref(trig_dets)
+    height = getindex.(shapes, :height)
+    string_ids = sort(unique(geds.detstring))
+    tops = [maximum(z[i] + height[i] / 2 for i in eachindex(z, height, geds.detstring) if geds.detstring[i] == s) for s in string_ids]
+    shift = Dict(zip(string_ids, maximum(tops) .- tops))
 
-    detectors = (; detector = geds.detector, detstring = geds.detstring, position = geds.position, z, triggered, in_event = geds.detector .∈ Ref(Set(evt.geds.detector)),
-        radius = getindex.(shapes, :radius), height = getindex.(shapes, :height), dphi = _wrap_degrees.(det_angles .- main_angle))
+    detectors = (; detector = geds.detector, detstring = geds.detstring, position = geds.position, side_z = z .+ getindex.(Ref(shift), geds.detstring), triggered,
+        in_event = geds.detector .∈ Ref(Set(evt.geds.detector)), radius = getindex.(shapes, :radius), height, dphi = _wrap_degrees.(det_angles .- main_angle))
 
-    strings = map(sort(unique(geds.detstring))) do s
+    strings = map(string_ids) do s
         sel = findall(==(s), geds.detstring)
-        (detstring = s, x = first(x[sel]), y = first(y[sel]), radius = maximum(detectors.radius[sel]), top = maximum(z[sel] .+ detectors.height[sel] ./ 2),
-            dphi = first(detectors.dphi[sel]), triggered = any(triggered[sel]))
+        (detstring = s, x = first(x[sel]), y = first(y[sel]), radius = maximum(detectors.radius[sel]), dphi = first(detectors.dphi[sel]), triggered = any(triggered[sel]))
     end
 
     # the light per SiPM over the windows of the event tier; a channel outside the event tier has none
@@ -151,19 +164,24 @@ function _event_signal_channels(evt, lar_energy)
     Dict(:geds => Set(evt.geds.trig_e_det), :spms => Set(evt.spms.detector[lit]))
 end
 
-# The color scale covers at least 0.5 to 10 PE and widens to the smallest and largest light of the event
-function _event_pe_limits(array, triggers, pe_limits)
-    isnothing(pe_limits) || return pe_limits
-    pes = vcat(filter(>(0), array.sipms.pe), filter(>(0), [m.pe for m in array.modules]), triggers.pes)
-    isempty(pes) ? (0.5, 10.0) : (min(0.5, minimum(pes)), max(10.0, maximum(pes)))
-end
-
 # The text of a number; `Format.format` cuts a value that is not finite to the digits of `spec`
 _number_text(spec, v) = isfinite(v) ? Format.format(spec, v) : string(v)
 
+# The rows of the cut decisions in the table: the sub-table of the event tier that holds the decision,
+# the default column and the name of the row
+const _event_cuts = (lar = (table = :ged_spm, column = :is_valid_lar, name = "LAr cut"), muon = (table = :ged_pmt, column = :is_valid_muon, name = "muon cut"),
+    qc = (table = :geds, column = :is_valid_qc, name = "QC"), psd = (table = :geds, column = :is_valid_psd, name = "PSD cut"))
+
+# The column of every cut row, with the columns of `cuts` in place of the defaults
+function _event_cut_columns(cuts::NamedTuple)
+    unknown = filter(∉(keys(_event_cuts)), keys(cuts))
+    isempty(unknown) || throw(ArgumentError("`cuts` has no row $(join(unknown, ", ")), only $(join(keys(_event_cuts), ", "))"))
+    merge(map(c -> c.column, _event_cuts), map(Symbol, cuts))
+end
+
 # The observables of the event as text: the values of the event, the decisions of its cuts, and per
 # column the values of the triggered HPGe detectors, one per line
-function _event_observable_values(evt, array, config; energy, aoe, lq)
+function _event_observable_values(evt, array, config; energy, aoe, lq, cuts)
     (; lar_energy, cut_window, geometric) = config
     sum_of(cut, col) = getproperty(evt.ged_spm, Symbol(lar_energy, "_spms_", cut, "_", col))
     pe_text(v) = _number_text("{:.1f}", Unitful.ustrip(v)) * " PE"
@@ -178,33 +196,32 @@ function _event_observable_values(evt, array, config; energy, aoe, lq)
         geometric_cut = "$(geometric.name)_$(geometric.window)"
         push!(event, pe_text(sum_of(geometric_cut, "pe_sum")), string(sum_of(geometric_cut, "multiplicity")))
     end
-    passed_text(is_valid) = is_valid ? "passed" : "not passed"
-    cuts = [evt.ged_spm.is_valid_lar ? "passed" : "vetoed", passed_text(evt.ged_pmt.is_valid_muon), passed_text(evt.geds.is_valid_qc), passed_text(evt.geds.is_valid_psd)]
+    decisions = map(collect(pairs(cuts))) do (k, column)
+        table = _event_cuts[k].table
+        sub = getproperty(evt, table)
+        hasproperty(sub, column) || throw(ArgumentError("The event has no column `$table.$column` for the cut row `$k`"))
+        is_valid = getproperty(sub, column)
+        is_valid isa Bool || throw(ArgumentError("The cut column `$table.$column` must hold one Bool per event, got a $(typeof(is_valid))"))
+        is_valid ? "passed" : k == :lar ? "vetoed" : "not passed"
+    end
 
     triggered = [string.(evt.geds.detector[idxs]), ["$(detstring[i]), $(position[i])" for i in places],
         energy_text.(energies), _number_text.("{:.2f}", getproperty(evt.geds, aoe)[idxs]), _number_text.("{:.2f}", getproperty(evt.geds, lq)[idxs])]
-    (; event, cuts, triggered = [join(column, "\n") for column in triggered])
-end
-
-# The tick values of a logarithmic color bar over `limits`
-function _pe_ticks(limits)
-    decades = floor(Int, log10(first(limits))):ceil(Int, log10(last(limits)))
-    ticks = [m * 10.0^d for d in decades for m in (1, 2, 5)]
-    filter(t -> first(limits) <= t <= last(limits), ticks)
+    (; event, cuts = decisions, triggered = [join(column, "\n") for column in triggered])
 end
 
 _pe_label(t) = isinteger(t) ? string(round(Int, t)) : string(t)
 
-# The color of an amount of light on the logarithmic scale of the color bar
-function _pe_color(pe, limits)
-    Makie.RGBAf(Makie.interpolated_getindex(Makie.to_colormap(_lar_colormap), log10(pe), (log10(first(limits)), log10(last(limits)))))
+function _pe_color(pe)
+    pe >= 0 || throw(ArgumentError("The light of a SiPM or a pulse must be at least 0 PE, got $pe"))
+    _pe_colors[searchsortedlast(_pe_edges, pe) + 1]
 end
 
 # The markers of SiPMs: the ones without light are hollow and drawn first, the ones with light take
 # the color of their light on top of them; the edge tells whether the SiPM is in the geometric cut.
-function _sipm_marker_data(points, pe, in_cut, in_event, limits)
+function _sipm_marker_data(points, pe, in_cut, in_event)
     order = vcat(findall(iszero, pe), findall(>(0), pe))
-    color = [pe[i] > 0 ? _pe_color(pe[i], limits) : in_event[i] ? _rgba(:white) : _rgba(_absent_sipm_color) for i in order]
+    color = [pe[i] > 0 ? _pe_color(pe[i]) : in_event[i] ? _rgba(:white) : _rgba(_absent_sipm_color) for i in order]
     strokecolor = [in_cut[i] ? _rgba(LegendMakie.AchatBlue) : _rgba(_outside_cut_color) for i in order]
     (points = points[order], color, strokecolor)
 end
@@ -249,7 +266,7 @@ function _build_event_top_view!(pos, array, geometric)
     (; sectors, edges, strings, string_names, markers)
 end
 
-function _fill_event_top_view!(h, array, geometric, limits)
+function _fill_event_top_view!(h, array, geometric)
     r_outer, r_inner = array.radii.outer, array.radii.inner
     limit_outer, limit_inner = geometric.dphi_max.outer, geometric.dphi_max.inner
     band, wedge = _rgba(LegendMakie.AchatBlue, 0.22), _rgba(LegendMakie.AchatBlue, 0.09)
@@ -274,13 +291,13 @@ function _fill_event_top_view!(h, array, geometric, limits)
     Makie.update!(h.string_names, color = [s.triggered ? _rgba(:white) : _rgba(:gray35) for s in array.strings])
 
     m = array.modules
-    _update_sipm_markers!(h.markers, _sipm_marker_data([Makie.Point2f(x.x, x.y) for x in m], [x.pe for x in m], [x.in_cut for x in m], [x.in_event for x in m], limits))
+    _update_sipm_markers!(h.markers, _sipm_marker_data([Makie.Point2f(x.x, x.y) for x in m], [x.pe for x in m], [x.in_cut for x in m], [x.in_event for x in m]))
 end
 
 # The array seen from the side, unrolled around its axis: the azimuth relative to the main triggered
 # string runs along the axis, so that no string hides another one
 function _build_event_side_view!(pos, array, geometric)
-    (; strings, sipms) = array
+    (; detectors, strings, sipms) = array
     z_max = maximum(sipms.z) + 50
     z_min = minimum(sipms.z) - 50
     outer_limit = geometric.dphi_max.outer
@@ -291,8 +308,8 @@ function _build_event_side_view!(pos, array, geometric)
 
     bands = Makie.vspan!(ax, Float64[], Float64[], color = _rgba(LegendMakie.AchatBlue, 0.10))
     rects = Makie.poly!(ax, Makie.Rect2f[], color = Makie.RGBAf[], strokecolor = _string_edge_color, strokewidth = 0.8)
-    # one height for the numbers of the strings, above the highest detector
-    names_z = maximum(s.top for s in strings) + 14
+    # one height for the numbers of the strings, above the tops of the strings
+    names_z = maximum(detectors.side_z .+ detectors.height ./ 2) + 14
     string_names = Makie.text!(ax, [Makie.Point2f(s.dphi, names_z) for s in strings], text = [string(s.detstring) for s in strings], align = (:center, :bottom), fontsize = 12, color = :gray35)
     # the names of the triggered detectors stand on a white outline, over the detectors next to them
     trig_outlines = Makie.text!(ax, Makie.Point2f[], text = String[], align = (:left, :center), fontsize = 12, font = :bold, color = :white, strokecolor = :white, strokewidth = 3)
@@ -304,7 +321,7 @@ function _build_event_side_view!(pos, array, geometric)
     (; bands, rects, string_names, names_z, trig_outlines, trig_names, markers)
 end
 
-function _fill_event_side_view!(h, array, geometric, limits)
+function _fill_event_side_view!(h, array, geometric)
     (; detectors, strings, sipms) = array
 
     # the azimuths of the geometric cut in the outer barrel
@@ -318,10 +335,10 @@ function _fill_event_side_view!(h, array, geometric, limits)
     end
     Makie.update!(h.bands, arg1 = lows, arg2 = highs)
 
-    # a detector at its true height, and at the azimuth its width takes at the radius of a string
+    # a detector at the height of its string, and at the azimuth its width takes at the radius of a string
     string_radius = maximum(hypot(s.x, s.y) for s in strings)
     widths = rad2deg.(2 .* detectors.radius ./ string_radius)
-    Makie.update!(h.rects, arg1 = [Makie.Rect2f(detectors.dphi[i] - widths[i] / 2, detectors.z[i] - detectors.height[i] / 2, widths[i], detectors.height[i]) for i in eachindex(widths)],
+    Makie.update!(h.rects, arg1 = [Makie.Rect2f(detectors.dphi[i] - widths[i] / 2, detectors.side_z[i] - detectors.height[i] / 2, widths[i], detectors.height[i]) for i in eachindex(widths)],
         color = [detectors.triggered[i] ? _rgba(_trigger_color) : detectors.in_event[i] ? _rgba(_detector_color) : _rgba(:white) for i in eachindex(widths)])
 
     Makie.update!(h.string_names, arg1 = [Makie.Point2f(s.dphi, h.names_z) for s in strings])
@@ -329,13 +346,13 @@ function _fill_event_side_view!(h, array, geometric, limits)
     # the name of a detector far to the right of the main string stands on its left, inside the axis
     trig = findall(detectors.triggered)
     on_left = [detectors.dphi[i] > 90 for i in trig]
-    points = [Makie.Point2f(detectors.dphi[i] + (left ? -1 : 1) * (widths[i] / 2 + 2), detectors.z[i]) for (i, left) in zip(trig, on_left)]
+    points = [Makie.Point2f(detectors.dphi[i] + (left ? -1 : 1) * (widths[i] / 2 + 2), detectors.side_z[i]) for (i, left) in zip(trig, on_left)]
     aligns = [(left ? :right : :left, :center) for left in on_left]
     names = [string(detectors.detector[i]) for i in trig]
     Makie.update!(h.trig_outlines, arg1 = points, text = names, align = aligns)
     Makie.update!(h.trig_names, arg1 = points, text = names, align = aligns)
 
-    _update_sipm_markers!(h.markers, _sipm_marker_data(Makie.Point2f.(sipms.dphi, sipms.z), sipms.pe, sipms.in_cut, sipms.in_event, limits))
+    _update_sipm_markers!(h.markers, _sipm_marker_data(Makie.Point2f.(sipms.dphi, sipms.z), sipms.pe, sipms.in_cut, sipms.in_event))
 end
 
 # The windows of the LAr cut around the HPGe t0 with the positions of the SiPM triggers as bars
@@ -356,9 +373,9 @@ function _build_event_windows!(pos, windows, cut_window)
     (; bars)
 end
 
-function _fill_event_windows!(h, triggers, limits)
+function _fill_event_windows!(h, triggers)
     Makie.update!(h.bars, arg1 = [Makie.Point2f(t, y) for t in triggers.times for y in (0.0, 0.66)],
-        color = [_pe_color(pe, limits) for pe in triggers.pes for _ in 1:2])
+        color = [_pe_color(pe) for pe in triggers.pes for _ in 1:2])
 end
 
 # The file key and the date of the event with the logo in the corner of the figure
@@ -376,7 +393,7 @@ end
 
 # The observables centered over the waveforms: the values of the event, the decisions of its cuts,
 # and below them one row per triggered HPGe detector
-function _build_event_observables!(pos, geometric; energy, aoe, lq)
+function _build_event_observables!(pos, geometric; energy, aoe, lq, cuts)
     g = Makie.GridLayout(pos, tellheight = true)
     function table(row, names; first_color = :black)
         cells = Makie.GridLayout(g[row, 1], halign = :center, tellwidth = false)
@@ -390,10 +407,11 @@ function _build_event_observables!(pos, geometric; energy, aoe, lq)
     end
     has_geometric = !isnothing(geometric.name)
     event = table(1, vcat("energy sum", "LAr PE sum", "LAr multiplicity", has_geometric ? ["geom. cut PE sum", "geom. cut multiplicity"] : String[]))
-    cuts = table(2, ["LAr cut", "muon cut", "QC", "PSD cut"])
+    # a cut row with another column than its default is named after the column
+    decisions = table(2, [c == _event_cuts[k].column ? _event_cuts[k].name : string(c) for (k, c) in pairs(cuts)])
     triggered = table(3, ["triggered HPGe", "string, position", string(energy), string(aoe), string(lq)]; first_color = _trigger_color)
     Makie.rowgap!(g, 6)
-    (; event, cuts, triggered)
+    (; event, cuts = decisions, triggered)
 end
 
 # The legend of the array and the color scale of the light
@@ -405,19 +423,13 @@ function _build_event_key!(pos)
             marker(:white, LegendMakie.AchatBlue), marker(:white, _outside_cut_color)],
         ["HPGe string", "triggering HPGe", "HPGe off", "SiPM in the geom. cut", "SiPM outside"],
         orientation = :horizontal, nbanks = 2, framevisible = false, labelsize = 13, patchsize = (16, 14), tellwidth = false, tellheight = true)
-    colorbar = Makie.Colorbar(key[2, 1], vertical = false, flipaxis = false, colormap = _lar_colormap, limits = (0.5, 10.0), scale = log10,
+    # one block of the same width per class, labeled at its center
+    n = length(_pe_colors)
+    colorbar = Makie.Colorbar(key[2, 1], vertical = false, flipaxis = false, colormap = Makie.cgrad(_pe_colors, n, categorical = true),
+        limits = (0, n), ticks = ((1:n) .- 0.5, _pe_labels), minorticksvisible = false,
         label = "SiPM light in the windows (PE)", labelsize = 14, ticklabelsize = 12, height = 12, tellwidth = false)
     Makie.rowgap!(key, 2)
     (; colorbar)
-end
-
-function _fill_event_key!(h, limits)
-    ticks = _pe_ticks(limits)
-    h.colorbar.limits[] = limits
-    h.colorbar.ticks[] = (ticks, _pe_label.(ticks))
-    # the minor ticks of a color bar do not follow new limits on their own
-    h.colorbar.minorticks[] = Makie.IntervalsBetween(5, true)
-    nothing
 end
 
 # Draws the marks of `add_watermarks!` inside the axis `ax`, so that they follow the layout. The
@@ -485,12 +497,12 @@ end
 
 function LegendMakie.eventdisplay(data::LegendDataManagement.LegendData;
         figsize = (1800, 920), figure::Makie.Figure = Makie.Figure(size = figsize),
-        system = [:geds, :spms], lar_energy = nothing, lar_cut = :geom, energy::Symbol = :e_cusp_ctc_cal, aoe::Symbol = :aoe_sg_classifier, lq::Symbol = :lq80_250025_classifier,
-        pe_limits = nothing, only_processable::Bool = true, filterby = nothing, group = nothing, color::Symbol = isnothing(group) || group === false ? :amplitude : :group,
+        system = [:geds, :spms], lar_energy = nothing, lar_cut = :geom, energy::Symbol = :e_cusp_ctc_cal, aoe::Symbol = :aoe_sg_classifier, lq::Symbol = :lq80_250025_classifier, cuts::NamedTuple = (;),
+        only_processable::Bool = true, filterby = nothing, group = nothing, color::Symbol = isnothing(group) || group === false ? :amplitude : :group,
         exploded::Bool = false, ncols::Int = 3, plot_tier = LegendDataManagement.DataTier(:raw), subtract_baseline::Bool = true, xunit::Unitful.Units = u"µs", xlims = nothing,
         show_empty_traces::Bool = true, watermark::Bool = true, final::Bool = true, preliminary::Bool = true, approved::Bool = false, production::Bool = true)
     isempty(figure.content) || throw(ArgumentError("`figure` must be empty: the event display takes the whole figure. To show another event in the same figure, fill a display: `d = eventdisplay(data); lplot!(d, evt)`"))
-    options = (; system = _system_waveforms(system), lar_energy, lar_cut, energy, aoe, lq, pe_limits, only_processable, filterby, group, color, exploded, ncols, plot_tier, subtract_baseline, xunit, xlims,
+    options = (; system = _system_waveforms(system), lar_energy, lar_cut, energy, aoe, lq, cuts = _event_cut_columns(cuts), only_processable, filterby, group, color, exploded, ncols, plot_tier, subtract_baseline, xunit, xlims,
         show_empty_traces, watermark, final, preliminary, approved, production)
     EventDisplay(data, figure, options, nothing, @NamedTuple{radius::Float64, height::Float64}[], nothing, nothing, nothing)
 end
@@ -514,7 +526,7 @@ function _build_event_display!(d::EventDisplay, array, config; logo = FileIO.loa
     side_view = _build_event_side_view!(g[2, 2], array, config.geometric)
 
     right = Makie.GridLayout(g[2, 3])
-    observables = _build_event_observables!(right[1, 1], config.geometric; options.energy, options.aoe, options.lq)
+    observables = _build_event_observables!(right[1, 1], config.geometric; options.energy, options.aoe, options.lq, options.cuts)
     Makie.rowgap!(right, 6)
 
     Makie.colsize!(g, 1, Makie.Relative(0.35))
@@ -529,16 +541,15 @@ function _build_event_display!(d::EventDisplay, array, config; logo = FileIO.loa
 end
 
 # Fills everything but the waveforms
-function _fill_event_panels!(h, filekey, date, values, array, config, triggers, limits)
+function _fill_event_panels!(h, filekey, date, values, array, config, triggers)
     h.title.filekey.text[] = filekey
     h.title.date.text[] = date
     foreach((label, text) -> label.text[] = text, h.observables.event, values.event)
     foreach((label, text) -> label.text[] = text, h.observables.cuts, values.cuts)
     foreach((label, text) -> label.text[] = text, h.observables.triggered, values.triggered)
-    _fill_event_top_view!(h.top_view, array, config.geometric, limits)
-    _fill_event_side_view!(h.side_view, array, config.geometric, limits)
-    _fill_event_windows!(h.windows, triggers, limits)
-    _fill_event_key!(h.key, limits)
+    _fill_event_top_view!(h.top_view, array, config.geometric)
+    _fill_event_side_view!(h.side_view, array, config.geometric)
+    _fill_event_windows!(h.windows, triggers)
 end
 
 function LegendMakie.lplot!(d::EventDisplay, evt::NamedTuple)
@@ -561,20 +572,19 @@ function LegendMakie.lplot!(d::EventDisplay, evt::NamedTuple)
     shapes = rebuild ? _detector_shapes(d.data, config.geds.detector) : d.shapes
     array = _event_array(config.geds, config.spms, shapes, evt, config.lar_energy, config.lar, config.geometric.dphi_max)
     triggers = _event_lar_triggers(evt, config.lar_energy, config.lar, getproperty(config.windows, config.cut_window))
-    limits = _event_pe_limits(array, triggers, options.pe_limits)
-    values = _event_observable_values(evt, array, config; options.energy, options.aoe, options.lq)
+    values = _event_observable_values(evt, array, config; options.energy, options.aoe, options.lq, options.cuts)
 
     # A failure from here on can leave a partly drawn figure: the key is only set again at the end,
     # so that the next event then builds a new layout.
     d.key = nothing
     d.shapes = shapes
     rebuild && _build_event_display!(d, array, config)
-    _fill_event_panels!(d.plots, string(fk), _event_date(ts), values, array, config, triggers, limits)
+    _fill_event_panels!(d.plots, string(fk), _event_date(ts), values, array, config, triggers)
 
     panels = fetch(panels_task)
     if !isnothing(d.waveforms) && d.waveforms.key != _panel_key(panels)
         _build_event_display!(d, array, config)
-        _fill_event_panels!(d.plots, string(fk), _event_date(ts), values, array, config, triggers, limits)
+        _fill_event_panels!(d.plots, string(fk), _event_date(ts), values, array, config, triggers)
     end
     isnothing(d.waveforms) && (d.waveforms = _build_event_waveforms!(d.waveform_grid, panels, options))
     _fill_event_waveforms!(d.waveforms, panels, Unitful.ustrip(u"µs", evt.geds.t0_start), config.windows, config.cut_window, options)

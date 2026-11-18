@@ -57,11 +57,15 @@ Needs the positions of the metadata `hardware/geometry` and an event configurati
 The figure shows the file key and the date and time of the event, the array from the top and from
 the side, the SiPM triggers in the windows of the LAr cut around the HPGe t0, the observables of the
 event and of its triggered HPGe detectors, whether it passed the LAr, muon, QC and PSD cuts, and the
-waveforms of `lplot(data, ts)`. The side view
-is unrolled around the array axis: the azimuth relative to the triggered string with the largest
-energy runs along the horizontal axis, so that no string hides another one. SiPMs with light take
-the color of their photoelectrons in the windows, and the top view adds up the SiPMs of a module;
-the edge of a SiPM marks whether it is in the geometric cut around the triggered strings.
+waveforms of `lplot(data, ts)`. The side view is unrolled around the array axis: the azimuth
+relative to the triggered string with the largest energy runs along the horizontal axis, so that no
+string hides another one. All strings hang from one height: each string is shifted so that the top
+of its highest detector is level with the highest one of the array, the distances within a string
+are those of the metadata, and the SiPMs are at their heights in the metadata. SiPMs with light take
+the color of their photoelectrons (PE) in the windows, and the top view adds up the SiPMs of a
+module; the edge of a SiPM marks whether it is in the geometric cut around the triggered strings.
+The colors are classes, the same for every event: one each for up to 1, 2 and 3 PE, then 4–5, 6–10
+and more than 10 PE, with the edges halfway between whole numbers.
 
 Keywords:
 * `lar_energy`: the SiPM energy type, by default the one of the column `is_valid_lar`.
@@ -69,8 +73,11 @@ Keywords:
   columns of that cut.
 * `energy = :e_cusp_ctc_cal`, `aoe = :aoe_sg_classifier`, `lq = :lq80_250025_classifier`: the
   columns of `evt.geds` to show per triggered HPGe detector; the energy sum adds up `energy`.
-* `pe_limits`: the limits of the color scale, by default at least 0.5 to 10 PE and wide enough for
-  the light of the event.
+* `cuts = (;)`: the columns of the cut rows, as a `NamedTuple` with the rows `lar`, `muon`, `qc` and
+  `psd`; `cuts = (; psd = col)` takes the PSD row from the column `evt.geds.col`. `lar` reads
+  `evt.ged_spm`, `muon` reads `evt.ged_pmt`, and `qc` and `psd` read `evt.geds`. A row that is not
+  given keeps its column `is_valid_lar`, `is_valid_muon`, `is_valid_qc` or `is_valid_psd`, and a
+  row with another column is named after the column. A column must hold one `Bool` per event.
 * `figure`: the empty figure to fill, by default a new one of the size `figsize`. A new layout
   clears it.
 * `watermark = true`, `final = true`, `preliminary = true`, `approved = false`, `production = true`:

@@ -488,6 +488,12 @@ end
             @test array.sipms.dphi == [0.0, 0.0, -180.0, -180.0, 90.0]
             @test [m.pe for m in array.modules] == [6.0, 0.0, 0.0]
             @test array.radii == (outer = 280.0, inner = 120.0)
+            @test array.detectors.side_z == [-500.0, -600.0, -500.0]
+
+            # the side view levels the tops of the strings at the highest one and keeps the SiPMs
+            uneven = ext._event_array(TypedTables.Table(geds; z = [-500.0, -600.0, -480.0]u"mm"), spms, shapes, evt, :trig_max_trap_cal, lar, (inner = 180.0, outer = 45.0))
+            @test uneven.detectors.side_z == [-480.0, -580.0, -480.0]
+            @test uneven.sipms.z == array.sipms.z
 
             # a trigger counts in the window of the cut, unless it is flagged as a dark count
             triggers = ext._event_lar_triggers(evt, :trig_max_trap_cal, lar, (-1.5, 5.0))
@@ -521,9 +527,8 @@ end
                 local array = ext._event_array(geds, spms, shapes, event, :trig_max_trap_cal, lar, config.geometric.dphi_max)
                 isnothing(d.plots) && ext._build_event_display!(d, array, config)
                 local triggers = ext._event_lar_triggers(event, :trig_max_trap_cal, lar, (-1.5, 5.0))
-                limits = ext._event_pe_limits(array, triggers, nothing)
                 values = (event = [string(length(trig)), "1.0 PE", "2", "1.0 PE", "2"], cuts = ["vetoed", "passed", "not passed", string(length(trig))], triggered = [join(string.(trig), "\n"), join(string.(eachindex(trig)), "\n"), "1", "2", "3"])
-                ext._fill_event_panels!(d.plots, "key", "date", values, array, config, triggers, limits)
+                ext._fill_event_panels!(d.plots, "key", "date", values, array, config, triggers)
                 isnothing(d.waveforms) && (d.waveforms = ext._build_event_waveforms!(d.waveform_grid, panel_list, d.options))
                 ext._fill_event_waveforms!(d.waveforms, panel_list, 50.0, config.windows, config.cut_window, d.options)
                 Makie.colorbuffer(d.figure)
@@ -561,7 +566,7 @@ end
 
             # the name of a detector stays inside the side view
             far = merge(array, (; detectors = merge(array.detectors, (; dphi = [0.0, 150.0, -170.0], triggered = [true, true, true]))))
-            ext._fill_event_side_view!(ref.plots.side_view, far, config.geometric, (0.5, 10.0))
+            ext._fill_event_side_view!(ref.plots.side_view, far, config.geometric)
             @test [Makie.to_align(a) for a in ref.plots.side_view.trig_names.align[]] == Makie.to_align.([(:left, :center), (:right, :center), (:left, :center)])
             @test [p[1] for p in ref.plots.side_view.trig_names.arg1[]] ≈ [13.46, 136.54, -156.54] atol = 0.01
 
@@ -569,7 +574,7 @@ end
             windowed = (; config..., geometric = (name = :geom, window = :prompt, dphi_max = (inner = 180.0, outer = 45.0)))
             observed = merge(evt, (; ged_spm = merge(evt.ged_spm, (; trig_max_trap_cal_spms_full_pe_sum = 6.0, trig_max_trap_cal_spms_full_multiplicity = 2,
                 trig_max_trap_cal_spms_geom_prompt_pe_sum = 2.0, trig_max_trap_cal_spms_geom_prompt_multiplicity = 1))))
-            observables = (; energy = :e_cusp_ctc_cal, aoe = :aoe_sg_classifier, lq = :lq80_250025_classifier)
+            observables = (; energy = :e_cusp_ctc_cal, aoe = :aoe_sg_classifier, lq = :lq80_250025_classifier, cuts = ext._event_cut_columns((;)))
             text = ext._event_observable_values(observed, array, windowed; observables...)
             @test text.event == ["1000.00 keV", "6.0 PE", "2", "2.0 PE", "1"]
             @test text.cuts == ["vetoed", "passed", "passed", "not passed"]
@@ -581,9 +586,33 @@ end
             @test first(text.event) == "NaN keV"
             @test text.triggered[3:4] == ["NaN keV", "-Inf"]
 
-            @test ext._event_pe_limits(array, (; pes = [3.0]), nothing) == (0.5, 10.0)
-            @test ext._event_pe_limits(array, (; pes = [0.1, 300.0]), nothing) == (0.1, 300.0)
-            @test ext._event_pe_limits(array, (; pes = [3.0]), (1, 2)) == (1, 2)
+            # the cut rows read the columns of `cuts` and are named after a column other than the default
+            @test observables.cuts == (lar = :is_valid_lar, muon = :is_valid_muon, qc = :is_valid_qc, psd = :is_valid_psd)
+            ml_cuts = ext._event_cut_columns((; psd = "is_valid_psd_ml"))
+            @test ml_cuts == (lar = :is_valid_lar, muon = :is_valid_muon, qc = :is_valid_qc, psd = :is_valid_psd_ml)
+            label_texts(d) = [c.text[] for c in d.figure.content if c isa Makie.Label]
+            labelled = LegendMakie.eventdisplay(data; cuts = (; psd = :is_valid_psd_ml))
+            ext._build_event_display!(labelled, array, config)
+            @test "is_valid_psd_ml" in label_texts(labelled) && "PSD cut" ∉ label_texts(labelled)
+            @test all(in(label_texts(ref)), ["LAr cut", "muon cut", "QC", "PSD cut"])
+            ml = merge(observed, (; geds = merge(observed.geds, (; is_valid_psd_ml = true, is_valid_per_detector = [true, false, true]))))
+            @test ext._event_observable_values(ml, array, windowed; observables..., cuts = ml_cuts).cuts == ["vetoed", "passed", "passed", "passed"]
+            @test_throws "`cuts` has no row aoe" ext._event_cut_columns((; aoe = :is_valid_aoe))
+            @test_throws "`cuts` has no row aoe" LegendMakie.eventdisplay(data; cuts = (; aoe = :is_valid_aoe))
+            @test_throws "has no column `geds.is_valid_aoe` for the cut row `psd`" ext._event_observable_values(ml, array, windowed; observables..., cuts = ext._event_cut_columns((; psd = :is_valid_aoe)))
+            @test_throws "must hold one Bool per event" ext._event_observable_values(ml, array, windowed; observables..., cuts = ext._event_cut_columns((; qc = :is_valid_per_detector)))
+
+            # the light takes the color of its class, a class ends at its edge, light below the first
+            # edge is in the first class and above the last edge in the last one, and the color bar
+            # shows the classes in order with their labels
+            @test ext._pe_color.([0.2, 1.0, 1.49, 1.5, 2.49, 2.5, 3.0, 3.5, 5.49, 5.5, 10.49, 10.5, 85.0]) == ext._pe_colors[[1, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6]]
+            @test allunique(ext._pe_colors) && length(ext._pe_colors) == length(ext._pe_edges) + 1 == length(ext._pe_labels) && issorted(ext._pe_edges)
+            @test_throws "must be at least 0 PE, got NaN" ext._pe_color(NaN)
+            @test_throws "must be at least 0 PE, got -1.0" ext._pe_color(-1.0)
+            colorbar = ref.plots.key.colorbar
+            n = length(ext._pe_colors)
+            @test Makie.RGBAf.(colorbar.colormap[].colors) == ext._pe_colors && colorbar.limits[] == (0, n) && colorbar.ticks[] == ((1:n) .- 0.5, ext._pe_labels)
+            @test_throws MethodError LegendMakie.eventdisplay(data; pe_limits = (0.5, 10.0))
 
             # a display takes an empty figure, and a method error of a display needs no hint on loading
             occupied = Makie.Figure()
