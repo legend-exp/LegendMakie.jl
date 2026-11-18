@@ -29,12 +29,11 @@ module LegendMakieRadiationDetectorSignalsExt
 
     # A waveform, or several in one axis, with an entry in the legend for every label given
     function LegendMakie.lplot!(
-            wfs::Union{RadiationDetectorSignals.RDWaveform, AbstractVector{<:RadiationDetectorSignals.RDWaveform}};
+            fig::Makie.Figure, wfs::Union{RadiationDetectorSignals.RDWaveform, AbstractVector{<:RadiationDetectorSignals.RDWaveform}};
             xunit = Makie.Unitful.u"µs", xlabel = "Time ($xunit)", ylabel = "Signal", title::AbstractString = "", titlesize = 18,
             xlims = nothing, ylims = nothing, label = nothing, legend_position = :rt,
             watermark::Bool = true, final::Bool = !isempty(title), kwargs...
         )
-        fig = Makie.current_figure()
         ax = Makie.Axis(fig[1,1],
             dim1_conversion = Makie.UnitfulConversion(xunit, units_in_label = false),
             limits = (xlims, ylims), titlefont = :bold;
@@ -47,12 +46,13 @@ module LegendMakieRadiationDetectorSignalsExt
             waveformplot!(ax, wf; label = l, kwargs...)
         end
         isnothing(label) || legend_position == :none || Makie.axislegend(ax, position = legend_position)
-        watermark && LegendMakie.add_watermarks!(; final)
+        watermark && LegendMakie.add_watermarks!(fig, ax; final)
         fig
     end
 
     # one column per event class: waveforms on top, filter outputs at the optimum below
     function LegendMakie.lplot!(
+            fig::Makie.Figure,
             report::NamedTuple{(:classes, :wvfs, :flt), <:Tuple{AbstractVector{Symbol},
                 AbstractVector{<:RadiationDetectorSignals.RDWaveform}, AbstractVector{<:RadiationDetectorSignals.RDWaveform}}};
             xunit = Makie.Unitful.u"µs", title::AbstractString = "", titlesize = 18,
@@ -62,7 +62,6 @@ module LegendMakieRadiationDetectorSignalsExt
         axes(report.classes) == axes(report.wvfs) == axes(report.flt) || throw(DimensionMismatch(
             "classes, wvfs and flt must share axes"))
 
-        fig = Makie.current_figure()
         g = Makie.GridLayout(fig[1,1])
         colors = Makie.wong_colors()
 
@@ -88,8 +87,8 @@ module LegendMakieRadiationDetectorSignalsExt
             Makie.Label(g[1, :, Makie.Top()], title, padding = (0, 0, 25, 0), fontsize = titlesize, font = :bold)
         end
 
-        Makie.current_axis!(ax_flt)
-        watermark && LegendMakie.add_watermarks!(; final, kwargs...)
+        Makie.current_axis!(fig, ax_flt)
+        watermark && LegendMakie.add_watermarks!(fig, ax_flt; final, kwargs...)
         fig
     end
 

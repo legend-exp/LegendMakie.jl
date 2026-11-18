@@ -592,8 +592,8 @@ function LegendMakie.lplot!(d::EventDisplay, evt::NamedTuple)
     d.figure
 end
 
-function LegendMakie.lplot!(data::LegendDataManagement.LegendData, evt::NamedTuple; kwargs...)
-    LegendMakie.lplot!(LegendMakie.eventdisplay(data; figure = Makie.current_figure(), kwargs...), evt)
+function LegendMakie.lplot!(fig::Makie.Figure, data::LegendDataManagement.LegendData, evt::NamedTuple; kwargs...)
+    LegendMakie.lplot!(LegendMakie.eventdisplay(data; figure = fig, kwargs...), evt)
 end
 
 function LegendMakie.lplot(data::LegendDataManagement.LegendData, evt::NamedTuple; kwargs...)
@@ -603,7 +603,7 @@ end
 _read_event(data, tier, ts) = only(LegendDataManagement.read_ldata(data, tier, LegendDataManagement.find_filekey(data, ts), [ts]))
 
 LegendMakie.lplot!(d::EventDisplay, tier::LegendDataManagement.DataTier, ts::Unitful.Time{<:Real}) = LegendMakie.lplot!(d, _read_event(d.data, tier, ts))
-LegendMakie.lplot!(data::LegendDataManagement.LegendData, tier::LegendDataManagement.DataTier, ts::Unitful.Time{<:Real}; kwargs...) = LegendMakie.lplot!(data, _read_event(data, tier, ts); kwargs...)
+LegendMakie.lplot!(fig::Makie.Figure, data::LegendDataManagement.LegendData, tier::LegendDataManagement.DataTier, ts::Unitful.Time{<:Real}; kwargs...) = LegendMakie.lplot!(fig, data, _read_event(data, tier, ts); kwargs...)
 LegendMakie.lplot(data::LegendDataManagement.LegendData, tier::LegendDataManagement.DataTier, ts::Unitful.Time{<:Real}; kwargs...) = LegendMakie.lplot(data, _read_event(data, tier, ts); kwargs...)
 LegendMakie.lplot!(d::EventDisplay, ts::Unitful.Time{<:Real}; event_tier = :jlevt) = LegendMakie.lplot!(d, LegendDataManagement.DataTier(event_tier), ts)
 
